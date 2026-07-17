@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import {
   Bar,
   BarChart,
@@ -158,6 +159,43 @@ function DistributionLegend({
   const sortedData = [...data].sort((a, b) => b.value - a.value)
   const total = data.reduce((sum, row) => sum + row.value, 0)
 
+  if (showRanking) {
+    const COLUMN_SIZE = 5
+    const leaderboardColumns: Array<Array<{ label: string; value: number }>> = []
+    for (let index = 0; index < sortedData.length; index += COLUMN_SIZE) {
+      leaderboardColumns.push(sortedData.slice(index, index + COLUMN_SIZE))
+    }
+
+    const scaleStep = Math.max(0, sortedData.length - 10)
+    const dynamicFontRem = Math.max(0.72, 0.96 - scaleStep * 0.015)
+    const leaderboardStyle = { '--leaderboard-font-size': `${dynamicFontRem}rem` } as CSSProperties
+
+    return (
+      <div className="leaderboard-columns" style={leaderboardStyle} aria-label={`${labelKey} ranked leaderboard`}>
+        {leaderboardColumns.map((column, columnIndex) => (
+          <ol key={`col-${columnIndex}`} className="leaderboard-column" start={columnIndex * COLUMN_SIZE + 1}>
+            {column.map((entry, rowIndex) => {
+              const globalRank = columnIndex * COLUMN_SIZE + rowIndex + 1
+              const pct = total > 0 ? (entry.value / total) * 100 : 0
+              return (
+                <li key={entry.label}>
+                  <span className="leaderboard-rank">{globalRank}.</span>
+                  <span
+                    className="legend-swatch"
+                    style={{ backgroundColor: STACK_COLORS[(globalRank - 1) % STACK_COLORS.length] }}
+                    aria-hidden="true"
+                  />
+                  <span className="leaderboard-name">{entry.label}</span>
+                  <span className="leaderboard-value">{pct.toFixed(1)}% ({entry.value})</span>
+                </li>
+              )
+            })}
+          </ol>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <ul className="pie-legend" aria-label={`${labelKey} distribution legend`}>
       {sortedData.map((entry, index) => {
@@ -165,7 +203,7 @@ function DistributionLegend({
         return (
           <li key={entry.label}>
             <span className="legend-swatch" style={{ backgroundColor: STACK_COLORS[index % STACK_COLORS.length] }} />
-            <span className="legend-name">{showRanking ? `${index + 1}. ${entry.label}` : entry.label}</span>
+            <span className="legend-name">{entry.label}</span>
             <span className="legend-value">{pct.toFixed(1)}% ({entry.value})</span>
           </li>
         )
@@ -485,6 +523,90 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
   )
 }
 
+function ParetoChartCard({
+  title,
+  data,
+}: {
+  title: string
+  data: Array<{ candidate: string; votes: number; cumulativeSharePct: number }>
+}) {
+  return (
+    <article className="panel">
+      <h2>{title}</h2>
+      <div className="chart-surface wide">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 30, bottom: 8, left: 24 }}>
+            <XAxis dataKey="candidate" interval={0} angle={-18} textAnchor="end" height={74} />
+            <YAxis
+              yAxisId="votes"
+              label={{ value: 'Votes', angle: -90, position: 'insideLeft', offset: 2, fill: '#1f242c' }}
+            />
+            <YAxis
+              yAxisId="pct"
+              orientation="right"
+              domain={[0, 100]}
+              tickFormatter={(value) => `${value}%`}
+              label={{
+                value: 'Cumulative Share (%)',
+                angle: 90,
+                position: 'right',
+                dx: 12,
+                textAnchor: 'middle',
+                fill: '#1f242c',
+              }}
+            />
+            <Tooltip />
+            <Legend />
+            <Bar yAxisId="votes" dataKey="votes" name="Votes" fill="#00a651" radius={[6, 6, 0, 0]}>
+              <LabelList dataKey="votes" position="top" formatter={formatBarLabel} fill="#1f242c" fontSize={11} />
+            </Bar>
+            <Line yAxisId="pct" dataKey="cumulativeSharePct" name="Cumulative Share %" stroke="#0c0f12" strokeWidth={2} dot={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </article>
+  )
+}
+
+function ParetoIndicatorsCard({
+  title,
+  leadingVotes,
+  leadingCount,
+  totalVotes,
+}: {
+  title: string
+  leadingVotes: number
+  leadingCount: number
+  totalVotes: number
+}) {
+  const othersVotes = totalVotes - leadingVotes
+  const topLabel = `Top ${leadingCount}`
+
+  return (
+    <article className="panel">
+      <h2>{title}</h2>
+      <div className="kpi-grid">
+        <div>
+          <p>{topLabel} Votes</p>
+          <strong>{leadingVotes}</strong>
+        </div>
+        <div>
+          <p>{topLabel} Share</p>
+          <strong>{totalVotes > 0 ? ((leadingVotes / totalVotes) * 100).toFixed(1) : '0.0'}%</strong>
+        </div>
+        <div>
+          <p>Others Votes</p>
+          <strong>{othersVotes}</strong>
+        </div>
+        <div>
+          <p>Others Share</p>
+          <strong>{totalVotes > 0 ? ((othersVotes / totalVotes) * 100).toFixed(1) : '0.0'}%</strong>
+        </div>
+      </div>
+    </article>
+  )
+}
+
 function OveralGraphView({ records }: { records: NominationRecord[] }) {
   const candidateTotals = useMemo(() => aggregateByCandidate(records), [records])
 
@@ -501,68 +623,29 @@ function OveralGraphView({ records }: { records: NominationRecord[] }) {
     })
   }, [candidateTotals])
 
-  const topFiveVotes = candidateTotals.slice(0, 5).reduce((sum, row) => sum + row.votes, 0)
   const totalVotes = candidateTotals.reduce((sum, row) => sum + row.votes, 0)
-  const othersVotes = totalVotes - topFiveVotes
+  const paretoCutoffPct = 80
+  const leadingIndex = paretoData.findIndex((row) => row.cumulativeSharePct >= paretoCutoffPct)
+  const leadingCount = leadingIndex >= 0 ? leadingIndex + 1 : candidateTotals.length
+  const leadingVotes = candidateTotals.slice(0, leadingCount).reduce((sum, row) => sum + row.votes, 0)
 
   return (
     <section className="sheet-grid single">
-      <article className="panel">
-        <h2>Overall Votes and Concentration (Pareto)</h2>
-        <div className="chart-surface wide">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={paretoData} margin={{ top: 8, right: 30, bottom: 8, left: 24 }}>
-              <XAxis dataKey="candidate" interval={0} angle={-18} textAnchor="end" height={74} />
-              <YAxis
-                yAxisId="votes"
-                label={{ value: 'Votes', angle: -90, position: 'insideLeft', offset: 2, fill: '#1f242c' }}
-              />
-              <YAxis
-                yAxisId="pct"
-                orientation="right"
-                domain={[0, 100]}
-                tickFormatter={(value) => `${value}%`}
-                label={{
-                  value: 'Cumulative Share (%)',
-                  angle: 90,
-                  position: 'right',
-                  dx: 12,
-                  textAnchor: 'middle',
-                  fill: '#1f242c',
-                }}
-              />
-              <Tooltip />
-              <Legend />
-              <Bar yAxisId="votes" dataKey="votes" name="Votes" fill="#00a651" radius={[6, 6, 0, 0]}>
-                <LabelList dataKey="votes" position="top" formatter={formatBarLabel} fill="#1f242c" fontSize={11} />
-              </Bar>
-              <Line yAxisId="pct" dataKey="cumulativeSharePct" name="Cumulative Share %" stroke="#0c0f12" strokeWidth={2} dot={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </article>
+      <ParetoChartCard title="Overall Votes and Concentration (Pareto)" data={paretoData} />
+      <ParetoIndicatorsCard
+        title={`Concentration (Top ${leadingCount} reaches ${paretoCutoffPct}%)`}
+        leadingVotes={leadingVotes}
+        leadingCount={leadingCount}
+        totalVotes={totalVotes}
+      />
 
-      <article className="panel">
-        <h2>Top-5 Concentration</h2>
-        <div className="kpi-grid">
-          <div>
-            <p>Top 5 Votes</p>
-            <strong>{topFiveVotes}</strong>
-          </div>
-          <div>
-            <p>Top 5 Share</p>
-            <strong>{totalVotes > 0 ? ((topFiveVotes / totalVotes) * 100).toFixed(1) : '0.0'}%</strong>
-          </div>
-          <div>
-            <p>Others Votes</p>
-            <strong>{othersVotes}</strong>
-          </div>
-          <div>
-            <p>Others Share</p>
-            <strong>{totalVotes > 0 ? ((othersVotes / totalVotes) * 100).toFixed(1) : '0.0'}%</strong>
-          </div>
-        </div>
-      </article>
+      <ParetoChartCard title="Candidate Pareto (X-Axis: Candidates)" data={paretoData} />
+      <ParetoIndicatorsCard
+        title={`Candidate Indicators (Top ${leadingCount} reaches ${paretoCutoffPct}%)`}
+        leadingVotes={leadingVotes}
+        leadingCount={leadingCount}
+        totalVotes={totalVotes}
+      />
     </section>
   )
 }
