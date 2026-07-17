@@ -511,10 +511,26 @@ function OveralGraphView({ records }: { records: NominationRecord[] }) {
         <h2>Overall Votes and Concentration (Pareto)</h2>
         <div className="chart-surface wide">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={paretoData} margin={{ top: 8, right: 18, bottom: 8, left: 10 }}>
+            <ComposedChart data={paretoData} margin={{ top: 8, right: 30, bottom: 8, left: 24 }}>
               <XAxis dataKey="candidate" interval={0} angle={-18} textAnchor="end" height={74} />
-              <YAxis yAxisId="votes" />
-              <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+              <YAxis
+                yAxisId="votes"
+                label={{ value: 'Votes', angle: -90, position: 'insideLeft', offset: 2, fill: '#1f242c' }}
+              />
+              <YAxis
+                yAxisId="pct"
+                orientation="right"
+                domain={[0, 100]}
+                tickFormatter={(value) => `${value}%`}
+                label={{
+                  value: 'Cumulative Share (%)',
+                  angle: 90,
+                  position: 'right',
+                  dx: 12,
+                  textAnchor: 'middle',
+                  fill: '#1f242c',
+                }}
+              />
               <Tooltip />
               <Legend />
               <Bar yAxisId="votes" dataKey="votes" name="Votes" fill="#00a651" radius={[6, 6, 0, 0]}>
