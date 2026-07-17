@@ -1,0 +1,169 @@
+:root {
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: #1e2125;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(184, 30, 34, 0.16), transparent 35%),
+    radial-gradient(circle at 85% 20%, rgba(18, 58, 112, 0.12), transparent 42%),
+    #f5f7fa;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.dashboard-root {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 40px;
+}
+
+.hero-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.hero-banner h1 {
+  margin: 6px 0 8px;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+}
+
+.eyebrow {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #b81e22;
+  font-size: 0.84rem;
+}
+
+.muted {
+  color: #5b6673;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(170px, 230px));
+  gap: 12px;
+}
+
+.filter-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.filter-row select {
+  border: 1px solid #c7ced8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  background: #fff;
+}
+
+.panel {
+  border: 1px solid #d6dde8;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(27, 40, 61, 0.06);
+  padding: 18px;
+}
+
+.panel h2 {
+  margin-top: 0;
+  margin-bottom: 14px;
+  font-size: 1.15rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.stat-card {
+  padding: 16px;
+}
+
+.stat-label {
+  margin: 0;
+  color: #596070;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  margin: 6px 0 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #16233b;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 14px;
+}
+
+.chart-panel {
+  min-height: 430px;
+}
+
+.zone-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.zone-table th,
+.zone-table td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.zone-table th {
+  font-size: 0.85rem;
+  color: #5a6475;
+  text-transform: uppercase;
+}
+
+.error-panel {
+  border-color: #e6b8bb;
+  background: #fdf5f5;
+}
+
+.footer-note {
+  margin-top: 18px;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 900px) {
+  .hero-banner {
+    flex-direction: column;
+  }
+
+  .filter-row {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
