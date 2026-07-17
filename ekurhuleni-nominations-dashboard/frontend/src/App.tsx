@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { Leaderboard } from './components/Leaderboard'
-import { ZoneBreakdown } from './components/ZoneBreakdown'
+import ancLogo from './assets/African_National_Congress_logo.svg'
+import { WorkbookViews } from './components/WorkbookViews'
 import {
-  aggregateByCandidate,
-  aggregateByZone,
   fetchNominations,
   fetchWards,
   fetchZones,
@@ -53,9 +51,6 @@ function App() {
     })
   }, [records, selectedZone, selectedWard])
 
-  const leaderboardData = useMemo(() => aggregateByCandidate(filteredRecords), [filteredRecords])
-  const zoneData = useMemo(() => aggregateByZone(filteredRecords), [filteredRecords])
-
   const stats = useMemo(() => {
     const totalVotes = filteredRecords.reduce((sum, record) => sum + record.voteCount, 0)
     const candidateCount = new Set(filteredRecords.map((record) => record.candidateName)).size
@@ -78,10 +73,15 @@ function App() {
   return (
     <main className="dashboard-root">
       <header className="hero-banner">
-        <div>
+        <div className="hero-brand">
+          <div className="brand-mark-shell">
+            <img src={ancLogo} className="brand-mark" alt="ANC emblem" />
+          </div>
+          <div>
           <p className="eyebrow">ANC Ekurhuleni</p>
-          <h1>Nomination Analytics Dashboard</h1>
-          <p className="muted">Read-only leadership overview driven by Supabase nomination data.</p>
+          <h1>NOM2026 PR and Councillor Nominations</h1>
+          <p className="muted">Overview candidate nominations by Ward.</p>
+          </div>
         </div>
         <div className="filter-row">
           <label>
@@ -136,15 +136,12 @@ function App() {
             </article>
           </section>
 
-          <section className="content-grid">
-            <Leaderboard data={leaderboardData} />
-            <ZoneBreakdown data={zoneData} />
-          </section>
+          <WorkbookViews records={filteredRecords} zones={zones} />
         </>
       )}
 
-      <footer className="muted footer-note">
-        Data source: Supabase nominations table seeded from ANC nomination workbook.
+      <footer className="muted footer-note" role="contentinfo">
+        <p>Copyright © African National Congress 2026. All rights reserved.</p>
       </footer>
     </main>
   )
