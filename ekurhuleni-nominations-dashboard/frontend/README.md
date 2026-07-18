@@ -30,3 +30,14 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## Supabase For Netlify
+
+The deployed app must use hosted Supabase values, not the local container URL.
+
+Set these environment variables in Netlify and in your local `.env` file:
+
+- `VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co`
+- `VITE_SUPABASE_ANON_KEY=<your-project-anon-key>`
+
+Use `.env.example` as the template for local development.
