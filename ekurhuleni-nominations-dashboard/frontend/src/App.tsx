@@ -14,10 +14,6 @@ import {
 } from './lib/dashboardData'
 import type { Session, User } from '@supabase/supabase-js'
 
-const AUTH_EMAIL_STORAGE_KEY = 'anc-ekerhuleni.auth.email'
-const bootstrapAuthEmail = import.meta.env.VITE_BOOTSTRAP_EMAIL ?? ''
-const bootstrapAuthPassword = import.meta.env.VITE_BOOTSTRAP_PASSWORD ?? ''
-
 function getUserRole(user: User | null) {
   const rawRole = user?.app_metadata?.role ?? user?.user_metadata?.role
   return rawRole === 'admin' ? 'admin' : 'general'
@@ -27,8 +23,8 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
-  const [authEmail, setAuthEmail] = useState(bootstrapAuthEmail)
-  const [authPassword, setAuthPassword] = useState(bootstrapAuthPassword)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
   const [authBusy, setAuthBusy] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [activeMode, setActiveMode] = useState<'dashboard' | 'admin'>('dashboard')
@@ -44,11 +40,6 @@ function App() {
 
   useEffect(() => {
     let isMounted = true
-
-    const storedEmail = window.localStorage.getItem(AUTH_EMAIL_STORAGE_KEY)
-    if (storedEmail) {
-      setAuthEmail(storedEmail)
-    }
 
     supabase.auth
       .getSession()
@@ -179,8 +170,6 @@ function App() {
           throw signInError
         }
       }
-
-      window.localStorage.setItem(AUTH_EMAIL_STORAGE_KEY, authEmail)
     } catch (loginError) {
       setAuthError(loginError instanceof Error ? loginError.message : 'Authentication failed.')
     } finally {
@@ -293,6 +282,22 @@ function App() {
     </nav>
   )
 
+  const dashboardModeControls = (
+    <div className="mode-toggle" aria-label="Application mode">
+      <button type="button" className={activeMode === 'dashboard' ? 'sheet-tab active' : 'sheet-tab'} onClick={() => setActiveMode('dashboard')}>
+        Dashboard
+      </button>
+      {canAccessCms ? (
+        <button type="button" className={activeMode === 'admin' ? 'sheet-tab active' : 'sheet-tab'} onClick={() => setActiveMode('admin')}>
+          Admin CMS
+        </button>
+      ) : null}
+      <button type="button" className="sheet-tab" onClick={() => void handleSignOut()}>
+        Sign out
+      </button>
+    </div>
+  )
+
   if (activeMode === 'admin' && canAccessCms) {
     return (
       <main className="dashboard-root">
@@ -307,16 +312,21 @@ function App() {
 
   return (
     <main className="dashboard-root">
-      {modeSwitcher}
       <header className="hero-banner">
-        <div className="hero-brand">
-          <div className="brand-mark-shell">
-            <img src={ancLogo} className="brand-mark" alt="ANC emblem" />
+        <div className="hero-banner-top">
+          <div className="hero-brand">
+            <div className="brand-mark-shell">
+              <img src={ancLogo} className="brand-mark" alt="ANC emblem" />
+            </div>
+            <div>
+              <p className="eyebrow">ANC Ekurhuleni</p>
+              <h1>NOM2026 PR and Councillor Nominations</h1>
+              <p className="muted">Overview candidate nominations by Ward.</p>
+              <p className="muted hero-session-note">Signed in as {session.user.email ?? 'unknown user'} · {role === 'admin' ? 'Admin access' : 'General access'}</p>
+            </div>
           </div>
-          <div>
-          <p className="eyebrow">ANC Ekurhuleni</p>
-          <h1>NOM2026 PR and Councillor Nominations</h1>
-          <p className="muted">Overview candidate nominations by Ward.</p>
+          <div className="hero-actions">
+            {dashboardModeControls}
           </div>
         </div>
         <div className="filter-row">
