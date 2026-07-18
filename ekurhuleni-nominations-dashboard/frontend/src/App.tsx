@@ -210,10 +210,16 @@ function App() {
       <main className="dashboard-root auth-root">
         <section className="auth-shell">
           <div className="auth-hero panel">
+            <div className="auth-banner-frame">
+              <img src="/brand/ANC_Flag.jpg" className="auth-banner-image" alt="ANC flag and emblem banner" />
+              <div className="auth-banner-mark">
+                <img src={ancLogo} className="brand-mark" alt="ANC emblem" />
+              </div>
+            </div>
             <p className="eyebrow">ANC Ekurhuleni</p>
-            <h1>Election Nomination Management</h1>
-            <p className="hero-copy">A premium workspace for nomination analytics, general access, and controlled CMS editing for trusted admins.</p>
-            <div className="auth-badges">
+            <h1>NOM2026 PR and Councillor Nominations Dashboard</h1>
+            <p className="hero-copy">Your vote, your voice, our shared future.</p>
+            {/* <div className="auth-badges">
               <span>General users: dashboard only</span>
               <span>Admin users: dashboard + CMS</span>
               <span>Hosted on Supabase + Netlify</span>
@@ -231,7 +237,7 @@ function App() {
                 <strong>Role-aware</strong>
                 <p>Admin access is hidden unless authorized.</p>
               </article>
-            </div>
+            </div> */}
           </div>
 
           <form className="panel auth-card" onSubmit={handleAuthSubmit}>
@@ -268,7 +274,7 @@ function App() {
     <nav className="mode-bar panel" aria-label="Application mode">
       <div>
         <p className="eyebrow">ANC Ekurhuleni</p>
-        <h2>Election Nomination Management</h2>
+        <h2>NOM2026 PR and Councillor Nominations Dashboard</h2>
         <p className="muted">Signed in as {session.user.email ?? 'unknown user'} · {role === 'admin' ? 'Admin access' : 'General access'}</p>
       </div>
       <div className="mode-toggle">
