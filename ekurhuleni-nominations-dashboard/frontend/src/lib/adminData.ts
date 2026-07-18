@@ -8,6 +8,18 @@ type RawZone = {
   updated_at?: string
 }
 
+type RawAppUser = {
+  id: string
+  email: string
+  full_name: string
+  contact_number: string | null
+  role: 'SuperAdmin' | 'Admin' | 'Viewer'
+  is_active: boolean
+  last_login: string | null
+  created_at?: string
+  updated_at?: string
+}
+
 type RawWard = {
   id: string
   ward_number: number
@@ -59,6 +71,16 @@ export type AdminZone = {
   id: string
   name: string
   coordinatorName: string | null
+}
+
+export type AdminAppUser = {
+  id: string
+  email: string
+  fullName: string
+  contactNumber: string | null
+  role: 'SuperAdmin' | 'Admin' | 'Viewer'
+  isActive: boolean
+  lastLogin: string | null
 }
 
 export type AdminWard = {
@@ -273,6 +295,27 @@ export async function fetchAdminProfiles(): Promise<AdminProfile[]> {
   }))
 }
 
+export async function fetchAdminAppUsers(): Promise<AdminAppUser[]> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('id, email, full_name, contact_number, role, is_active, last_login')
+    .order('full_name', { ascending: true })
+
+  if (error) {
+    throw new Error(`Failed to load app users: ${error.message}`)
+  }
+
+  return (data as RawAppUser[]).map((row) => ({
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name,
+    contactNumber: row.contact_number,
+    role: row.role,
+    isActive: row.is_active,
+    lastLogin: row.last_login,
+  }))
+}
+
 export type AdminPayload =
   | { resource: 'zone'; id?: string; name: string; coordinatorName?: string | null }
   | { resource: 'ward'; id?: string; wardNumber: number; zoneId?: string | null }
@@ -291,6 +334,15 @@ export type AdminPayload =
       wardId?: string | null
       status: 'draft' | 'active' | 'archived'
       notes?: string | null
+    }
+  | {
+      resource: 'app_user'
+      id?: string
+      email: string
+      fullName: string
+      contactNumber?: string | null
+      role: 'SuperAdmin' | 'Admin' | 'Viewer'
+      isActive: boolean
     }
 
 export async function saveAdminRecord(payload: AdminPayload) {

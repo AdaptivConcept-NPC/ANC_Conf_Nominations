@@ -9,8 +9,22 @@ type LeaderboardProps = {
   data: LeaderboardRow[]
 }
 
+const EXCEL_COLORS = [
+  '#4472C4', '#ED7D31', '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47',
+  '#264478', '#9E480E', '#636363', '#997300', '#255E91', '#43682B'
+]
+
+const piePalette = [
+  ...EXCEL_COLORS,
+  ...Array.from({ length: 50 }, () => {
+    const h = Math.floor(Math.random() * 360)
+    const s = Math.floor(Math.random() * 30) + 60
+    const l = Math.floor(Math.random() * 30) + 40
+    return `hsl(${h}, ${s}%, ${l}%)`
+  })
+]
+
 export function Leaderboard({ data }: LeaderboardProps) {
-  const piePalette = ['#00a651', '#f7cd12', '#0c0f12', '#1f7d4b', '#d2ad10', '#3a3f46', '#0f8e4b']
   const totalVotes = data.reduce((sum, row) => sum + row.totalVotes, 0)
 
   const pieData = data.map((row) => ({

@@ -127,6 +127,21 @@ export const handler = async (event: { httpMethod?: string; body?: string | null
         return json(200, { ok: true })
       }
 
+      case 'app_user': {
+        const row = {
+          ...(payload.id ? { id: requiredString(payload.id, 'id') } : {}),
+          email: requiredString(payload.email, 'email'),
+          full_name: requiredString(payload.fullName, 'fullName'),
+          contact_number: typeof payload.contactNumber === 'string' ? payload.contactNumber.trim() : null,
+          role: payload.role === 'SuperAdmin' || payload.role === 'Admin' || payload.role === 'Viewer' ? payload.role : 'Viewer',
+          is_active: Boolean(payload.isActive),
+        }
+        const conflictKey = payload.id ? 'id' : 'email'
+        const { error } = await adminClient.from('app_users').upsert(row, { onConflict: conflictKey })
+        if (error) throw error
+        return json(200, { ok: true })
+      }
+
       default:
         return json(400, { ok: false, error: 'Unknown admin resource.' })
     }
