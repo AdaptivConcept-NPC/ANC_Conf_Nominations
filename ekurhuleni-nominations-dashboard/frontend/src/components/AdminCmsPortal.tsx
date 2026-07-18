@@ -140,7 +140,7 @@ export function AdminCmsPortal() {
       setAliasForm(emptyAliasForm)
       setProfileForm(emptyProfileForm)
       await loadAdminData()
-      } catch (saveError) {
+    } catch (saveError) {
       setError(readMessage(saveError))
     } finally {
       setSaving(null)

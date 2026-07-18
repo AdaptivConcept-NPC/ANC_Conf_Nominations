@@ -3,6 +3,7 @@ import './App.css'
 import ancLogo from './assets/African_National_Congress_logo.svg'
 import { AdminCmsPortal } from './components/AdminCmsPortal'
 import { WorkbookViews } from './components/WorkbookViews'
+import { supabase } from './lib/supabaseClient'
 import {
   fetchNominations,
   fetchWards,
@@ -11,8 +12,21 @@ import {
   type WardOption,
   type ZoneOption,
 } from './lib/dashboardData'
+import type { Session, User } from '@supabase/supabase-js'
+
+function getUserRole(user: User | null) {
+  const rawRole = user?.app_metadata?.role ?? user?.user_metadata?.role
+  return rawRole === 'admin' ? 'admin' : 'general'
+}
 
 function App() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [activeMode, setActiveMode] = useState<'dashboard' | 'admin'>('dashboard')
   const [zones, setZones] = useState<ZoneOption[]>([])
   const [wards, setWards] = useState<WardOption[]>([])
@@ -21,8 +35,54 @@ function App() {
   const [selectedWard, setSelectedWard] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const role = useMemo(() => getUserRole(session?.user ?? null), [session])
+  const canAccessCms = role === 'admin'
 
   useEffect(() => {
+    let isMounted = true
+
+    supabase.auth
+      .getSession()
+      .then(({ data, error: sessionError }) => {
+        if (!isMounted) {
+          return
+        }
+        if (sessionError) {
+          setAuthError(sessionError.message)
+        }
+        setSession(data.session)
+        setAuthLoading(false)
+      })
+      .catch((sessionError) => {
+        if (!isMounted) {
+          return
+        }
+        setAuthError(sessionError instanceof Error ? sessionError.message : 'Failed to load session.')
+        setAuthLoading(false)
+      })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      setAuthLoading(false)
+    })
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!session) {
+      setZones([])
+      setWards([])
+      setRecords([])
+      setLoading(false)
+      return
+    }
+
     async function loadDashboard() {
       setLoading(true)
       setError(null)
@@ -43,7 +103,13 @@ function App() {
     }
 
     void loadDashboard()
-  }, [])
+  }, [session])
+
+  useEffect(() => {
+    if (!canAccessCms) {
+      setActiveMode('dashboard')
+    }
+  }, [canAccessCms])
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
@@ -72,25 +138,129 @@ function App() {
     setSelectedWard('all')
   }
 
+  async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setAuthBusy(true)
+    setAuthError(null)
+
+    try {
+      if (authMode === 'signup') {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+          options: {
+            data: {
+              role: 'general',
+            },
+          },
+        })
+
+        if (signUpError) {
+          throw signUpError
+        }
+
+        setAuthError('Account created. Please confirm your email or sign in again if email verification is disabled.')
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword,
+        })
+
+        if (signInError) {
+          throw signInError
+        }
+      }
+    } catch (loginError) {
+      setAuthError(loginError instanceof Error ? loginError.message : 'Authentication failed.')
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    setSelectedZone('all')
+    setSelectedWard('all')
+    setActiveMode('dashboard')
+  }
+
+  if (authLoading) {
+    return (
+      <main className="dashboard-root">
+        <section className="panel auth-loading">
+          <p>Checking session...</p>
+        </section>
+      </main>
+    )
+  }
+
+  if (!session) {
+    return (
+      <main className="dashboard-root">
+        <section className="auth-shell">
+          <div className="auth-brand panel">
+            <div className="hero-brand">
+              <div className="brand-mark-shell">
+                <img src={ancLogo} className="brand-mark" alt="ANC emblem" />
+              </div>
+              <div>
+                <p className="eyebrow">ANC Ekurhuleni</p>
+                <h1>Election Nomination Management</h1>
+                <p className="muted">Sign in to access the dashboard. Admin users also get the CMS portal.</p>
+              </div>
+            </div>
+          </div>
+
+          <form className="panel auth-card" onSubmit={handleAuthSubmit}>
+            <h2>{authMode === 'login' ? 'Sign in' : 'Create account'}</h2>
+            <p className="muted">General users see the dashboard only. Admin users must have the admin role in Supabase metadata.</p>
+            <div className="auth-form-grid">
+              <label>
+                Email
+                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" required />
+              </label>
+              <label>
+                Password
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} required />
+              </label>
+            </div>
+            {authError ? <p className="auth-message">{authError}</p> : null}
+            <div className="action-row auth-actions">
+              <button type="submit" disabled={authBusy}>{authBusy ? 'Please wait...' : authMode === 'login' ? 'Sign in' : 'Sign up'}</button>
+              <button type="button" className="secondary-button" onClick={() => setAuthMode((current) => (current === 'login' ? 'signup' : 'login'))}>
+                {authMode === 'login' ? 'Need an account?' : 'Back to sign in'}
+              </button>
+            </div>
+          </form>
+        </section>
+      </main>
+    )
+  }
+
   const modeSwitcher = (
     <nav className="mode-bar panel" aria-label="Application mode">
       <div>
         <p className="eyebrow">ANC Ekurhuleni</p>
         <h2>Election Nomination Management</h2>
-        <p className="muted">Switch between live analytics and the admin CMS portal.</p>
+        <p className="muted">Signed in as {session.user.email ?? 'unknown user'} · {role === 'admin' ? 'Admin access' : 'General access'}</p>
       </div>
       <div className="mode-toggle">
         <button type="button" className={activeMode === 'dashboard' ? 'sheet-tab active' : 'sheet-tab'} onClick={() => setActiveMode('dashboard')}>
           Dashboard
         </button>
-        <button type="button" className={activeMode === 'admin' ? 'sheet-tab active' : 'sheet-tab'} onClick={() => setActiveMode('admin')}>
-          Admin CMS
+        {canAccessCms ? (
+          <button type="button" className={activeMode === 'admin' ? 'sheet-tab active' : 'sheet-tab'} onClick={() => setActiveMode('admin')}>
+            Admin CMS
+          </button>
+        ) : null}
+        <button type="button" className="sheet-tab" onClick={() => void handleSignOut()}>
+          Sign out
         </button>
       </div>
     </nav>
   )
 
-  if (activeMode === 'admin') {
+  if (activeMode === 'admin' && canAccessCms) {
     return (
       <main className="dashboard-root">
         {modeSwitcher}

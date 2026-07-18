@@ -1,3 +1,4 @@
 # Ignore source office documents kept outside version control
 NOM2026 PR and Councillor Nominations.xlsx
 System Architecture Blueprint & Database Schema Setup V2.docx
+.vscode
