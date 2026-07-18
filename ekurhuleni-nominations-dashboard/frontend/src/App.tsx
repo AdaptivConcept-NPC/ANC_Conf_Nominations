@@ -14,6 +14,10 @@ import {
 } from './lib/dashboardData'
 import type { Session, User } from '@supabase/supabase-js'
 
+const AUTH_EMAIL_STORAGE_KEY = 'anc-ekerhuleni.auth.email'
+const bootstrapAuthEmail = import.meta.env.VITE_BOOTSTRAP_EMAIL ?? ''
+const bootstrapAuthPassword = import.meta.env.VITE_BOOTSTRAP_PASSWORD ?? ''
+
 function getUserRole(user: User | null) {
   const rawRole = user?.app_metadata?.role ?? user?.user_metadata?.role
   return rawRole === 'admin' ? 'admin' : 'general'
@@ -23,8 +27,8 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
-  const [authEmail, setAuthEmail] = useState('')
-  const [authPassword, setAuthPassword] = useState('')
+  const [authEmail, setAuthEmail] = useState(bootstrapAuthEmail)
+  const [authPassword, setAuthPassword] = useState(bootstrapAuthPassword)
   const [authBusy, setAuthBusy] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [activeMode, setActiveMode] = useState<'dashboard' | 'admin'>('dashboard')
@@ -40,6 +44,11 @@ function App() {
 
   useEffect(() => {
     let isMounted = true
+
+    const storedEmail = window.localStorage.getItem(AUTH_EMAIL_STORAGE_KEY)
+    if (storedEmail) {
+      setAuthEmail(storedEmail)
+    }
 
     supabase.auth
       .getSession()
@@ -170,6 +179,8 @@ function App() {
           throw signInError
         }
       }
+
+      window.localStorage.setItem(AUTH_EMAIL_STORAGE_KEY, authEmail)
     } catch (loginError) {
       setAuthError(loginError instanceof Error ? loginError.message : 'Authentication failed.')
     } finally {
@@ -196,40 +207,56 @@ function App() {
 
   if (!session) {
     return (
-      <main className="dashboard-root">
+      <main className="dashboard-root auth-root">
         <section className="auth-shell">
-          <div className="auth-brand panel">
-            <div className="hero-brand">
-              <div className="brand-mark-shell">
-                <img src={ancLogo} className="brand-mark" alt="ANC emblem" />
-              </div>
-              <div>
-                <p className="eyebrow">ANC Ekurhuleni</p>
-                <h1>Election Nomination Management</h1>
-                <p className="muted">Sign in to access the dashboard. Admin users also get the CMS portal.</p>
-              </div>
+          <div className="auth-hero panel">
+            <p className="eyebrow">ANC Ekurhuleni</p>
+            <h1>Election Nomination Management</h1>
+            <p className="hero-copy">A premium workspace for nomination analytics, general access, and controlled CMS editing for trusted admins.</p>
+            <div className="auth-badges">
+              <span>General users: dashboard only</span>
+              <span>Admin users: dashboard + CMS</span>
+              <span>Hosted on Supabase + Netlify</span>
+            </div>
+            <div className="auth-kpis">
+              <article>
+                <strong>Workbook</strong>
+                <p>Analytics-first views with ANC styling.</p>
+              </article>
+              <article>
+                <strong>Secure</strong>
+                <p>Service-role writes stay server-side.</p>
+              </article>
+              <article>
+                <strong>Role-aware</strong>
+                <p>Admin access is hidden unless authorized.</p>
+              </article>
             </div>
           </div>
 
           <form className="panel auth-card" onSubmit={handleAuthSubmit}>
-            <h2>{authMode === 'login' ? 'Sign in' : 'Create account'}</h2>
-            <p className="muted">General users see the dashboard only. Admin users must have the admin role in Supabase metadata.</p>
+            <div className="auth-card-head">
+              <div>
+                <h2>{authMode === 'login' ? 'Sign in' : 'Create account'}</h2>
+                <p className="muted">Use your email and password. If you have a seeded bootstrap account, it will appear here once set.</p>
+              </div>
+              <button type="button" className="secondary-button auth-switch" onClick={() => setAuthMode((current) => (current === 'login' ? 'signup' : 'login'))}>
+                {authMode === 'login' ? 'Need an account?' : 'Back to sign in'}
+              </button>
+            </div>
             <div className="auth-form-grid">
               <label>
                 Email
-                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" required />
+                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" placeholder="name@example.com" required />
               </label>
               <label>
                 Password
-                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} required />
+                <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} placeholder="••••••••" required />
               </label>
             </div>
             {authError ? <p className="auth-message">{authError}</p> : null}
             <div className="action-row auth-actions">
               <button type="submit" disabled={authBusy}>{authBusy ? 'Please wait...' : authMode === 'login' ? 'Sign in' : 'Sign up'}</button>
-              <button type="button" className="secondary-button" onClick={() => setAuthMode((current) => (current === 'login' ? 'signup' : 'login'))}>
-                {authMode === 'login' ? 'Need an account?' : 'Back to sign in'}
-              </button>
             </div>
           </form>
         </section>
