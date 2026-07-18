@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import ancLogo from './assets/African_National_Congress_logo.svg'
+import { AdminCmsPortal } from './components/AdminCmsPortal'
 import { WorkbookViews } from './components/WorkbookViews'
 import {
   fetchNominations,
@@ -12,6 +13,7 @@ import {
 } from './lib/dashboardData'
 
 function App() {
+  const [activeMode, setActiveMode] = useState<'dashboard' | 'admin'>('dashboard')
   const [zones, setZones] = useState<ZoneOption[]>([])
   const [wards, setWards] = useState<WardOption[]>([])
   const [records, setRecords] = useState<NominationRecord[]>([])
@@ -70,8 +72,39 @@ function App() {
     setSelectedWard('all')
   }
 
+  const modeSwitcher = (
+    <nav className="mode-bar panel" aria-label="Application mode">
+      <div>
+        <p className="eyebrow">ANC Ekurhuleni</p>
+        <h2>Election Nomination Management</h2>
+        <p className="muted">Switch between live analytics and the admin CMS portal.</p>
+      </div>
+      <div className="mode-toggle">
+        <button type="button" className={activeMode === 'dashboard' ? 'sheet-tab active' : 'sheet-tab'} onClick={() => setActiveMode('dashboard')}>
+          Dashboard
+        </button>
+        <button type="button" className={activeMode === 'admin' ? 'sheet-tab active' : 'sheet-tab'} onClick={() => setActiveMode('admin')}>
+          Admin CMS
+        </button>
+      </div>
+    </nav>
+  )
+
+  if (activeMode === 'admin') {
+    return (
+      <main className="dashboard-root">
+        {modeSwitcher}
+        <AdminCmsPortal />
+        <footer className="muted footer-note" role="contentinfo">
+          <p>Copyright © African National Congress 2026. All rights reserved.</p>
+        </footer>
+      </main>
+    )
+  }
+
   return (
     <main className="dashboard-root">
+      {modeSwitcher}
       <header className="hero-banner">
         <div className="hero-brand">
           <div className="brand-mark-shell">

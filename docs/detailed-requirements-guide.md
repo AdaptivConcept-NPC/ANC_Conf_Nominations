@@ -81,6 +81,7 @@ Core entities:
 - Zone: logical grouping of wards with zonal coordinator label
 - Ward: numbered administrative unit, mapped to a zone
 - Candidate: unique person identity (canonical full name)
+- Candidate profile: editable administrative record for candidate metadata used by the CMS portal
 - Nomination: vote tally for candidate in a ward for a nomination event
 - Ingestion batch: uploaded or processed dataset run metadata
 - Name alias: raw source variant mapped to canonical candidate
@@ -92,9 +93,32 @@ Core entities:
 1. `zones`
 2. `wards`
 3. `candidates`
-4. `candidate_aliases`
-5. `nominations`
-6. `ingestion_batches`
+4. `candidate_profiles`
+5. `candidate_aliases`
+6. `nominations`
+7. `ingestion_batches`
+
+### 7.1.1 Administrative Tables and Semantics
+
+- `candidate_profiles`: editable CMS-facing record for candidate biography, image, contact metadata, ward/zone attribution, and status flags.
+- `zones`: reference table for dropdowns and zonal grouping.
+- `wards`: reference table for dropdowns and ward selection.
+- `candidates`: canonical candidate identity table used by nominations and profiles.
+- `candidate_aliases`: workbook/source-name normalization table.
+- `nominations`: fact table containing the vote counts.
+- `ingestion_batches`: audit table for workbook imports and transfer runs.
+
+Recommended candidate profile fields for v1:
+- `candidate_id` (FK to `candidates`)
+- `display_name`
+- `photo_url`
+- `short_bio`
+- `contact_phone`
+- `contact_email`
+- `zone_id` (optional FK to `zones`)
+- `ward_id` (optional FK to `wards`)
+- `status` (`draft`, `active`, `archived`)
+- `notes`
 
 ### 7.2 SQL Baseline (Implementation-Ready)
 
@@ -210,6 +234,21 @@ Acceptance criteria:
 - FR-REP-02: Export files include zone, ward, candidate, and vote_count columns.
 - FR-REP-03: Exported totals must match visible dashboard totals.
 
+### 8.5 Admin CMS Portal
+
+- FR-ADM-01: Authorized users can create, edit, and archive candidate profiles from a web-based CMS portal.
+- FR-ADM-02: Authorized users can create, edit, and deactivate reference-table rows for zones and wards used by dropdowns.
+- FR-ADM-03: Authorized users can maintain candidate canonical records and alias mappings from the CMS portal.
+- FR-ADM-04: The CMS portal shall validate unique reference keys before saving, including zone name, ward number, candidate full name, and alias text.
+- FR-ADM-05: The CMS portal shall surface import status, seed status, and latest ingestion batch metadata.
+- FR-ADM-06: The CMS portal shall support creating draft candidate profiles without exposing service-role credentials to the browser.
+
+Acceptance criteria:
+- Candidate profile CRUD works for authorized users only.
+- Reference-table edits are reflected immediately in dropdowns after refresh.
+- Duplicate zone, ward, candidate, or alias entries are blocked with a clear validation message.
+- CMS users can see a transfer/report panel showing imported counts and last successful batch.
+
 ## 9. Non-Functional Requirements
 
 - NFR-PERF-01: P95 dashboard filter response <= 300 ms for <= 10k nomination rows.
@@ -231,11 +270,16 @@ Read endpoints (or equivalent Supabase RPC/views):
 Write endpoints (optional mode):
 - POST `/api/nominations`
 - PUT `/api/nominations/{id}`
+- POST `/api/admin/candidate-profiles`
+- PUT `/api/admin/candidate-profiles/{id}`
+- POST `/api/admin/reference-rows`
+- PUT `/api/admin/reference-rows/{id}`
 
 Query requirements:
 - Aggregate by candidate and order by vote_count desc.
 - Support optional zone and ward filters.
 - Use indexed join path: nominations -> wards -> zones and nominations -> candidates.
+- Provide CMS read queries for candidate profiles, alias mappings, zones, wards, and batch status.
 
 ## 11. Frontend Requirements
 
@@ -245,11 +289,13 @@ Pages/components expected:
 - Zone distribution chart
 - Overall summary card set
 - Error and loading state components
+- Admin CMS portal with candidate profile editor, reference-table editor, and transfer report panel
 
 Implementation notes for current codebase:
 - Replace template content in `frontend/src/App.tsx` with dashboard shell.
 - Integrate `frontend/src/components/Leaderboard.tsx` into App and add typed DTO mapping.
 - Add robust env validation in `frontend/src/lib/supabaseClient.ts`.
+- Add an authenticated admin route or tab that reuses the shared Supabase client for read-only previews and a secured write path for CMS changes.
 
 ## 12. Security and Access Control
 
@@ -284,6 +330,11 @@ Phase 2: Dashboard
 - Connect Supabase read queries and loading/error states
 - Add CSV export capability
 
+Phase 2b: Admin CMS Portal
+- Build candidate profile editor and reference-table maintenance screens
+- Add validation for candidate, zone, ward, and alias uniqueness
+- Show transfer status and import summary to administrators
+
 Phase 3: Hardening
 - Add optional secured write path via serverless function
 - Add tests and CI checks
@@ -309,3 +360,30 @@ v1 is complete when:
 - alias normalization resolves known typos consistently
 - core performance/security requirements pass verification
 - deployment to Netlify with environment-secure configuration is successful
+
+## 17. Data Transfer Report
+
+Status: hosted Supabase project initialized and reachable from the app.
+
+Completed on hosted Supabase (`zilabbyqoaivtgqdeijd`):
+- schema applied successfully from the implementation SQL baseline
+- live API access confirmed for `public.nominations`
+- seed data loaded for the workbook-derived reference set
+
+Current transferred dataset snapshot:
+- zones: 5
+- wards: 11
+- candidates: 6
+- candidate_aliases: 3
+- nominations: 14
+
+Workbook-derived canonicalization rules used in the transfer:
+- `DOCTOR XHAKZA` -> `DOCTOR XHAKAZA`
+- `Jean sethato` -> `Jean Sethato`
+- `Nomadlozi nkosi` -> `Nomadlozi Nkosi`
+- `jongizizwe Dlabathi` -> `Jongizwe Dlabathi`
+
+Open follow-up for the admin CMS sprint:
+- capture candidate profile metadata beyond vote totals
+- extend the transfer pipeline to replay the full workbook extraction flow into hosted Supabase
+- add a privileged write path for profile/reference-table updates

@@ -24,6 +24,22 @@ CREATE TABLE IF NOT EXISTS candidates (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS candidate_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  candidate_id UUID NOT NULL UNIQUE REFERENCES candidates(id) ON DELETE CASCADE,
+  display_name VARCHAR(200) NOT NULL,
+  photo_url TEXT,
+  short_bio TEXT,
+  contact_phone VARCHAR(40),
+  contact_email VARCHAR(200),
+  zone_id UUID REFERENCES zones(id) ON DELETE SET NULL,
+  ward_id UUID REFERENCES wards(id) ON DELETE SET NULL,
+  status VARCHAR(24) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS candidate_aliases (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
@@ -56,11 +72,14 @@ CREATE TABLE IF NOT EXISTS nominations (
 CREATE INDEX IF NOT EXISTS idx_nominations_ward_id ON nominations(ward_id);
 CREATE INDEX IF NOT EXISTS idx_nominations_candidate_id ON nominations(candidate_id);
 CREATE INDEX IF NOT EXISTS idx_wards_zone_id ON wards(zone_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_profiles_zone_id ON candidate_profiles(zone_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_profiles_ward_id ON candidate_profiles(ward_id);
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 
 GRANT SELECT ON TABLE zones TO anon, authenticated;
 GRANT SELECT ON TABLE wards TO anon, authenticated;
 GRANT SELECT ON TABLE candidates TO anon, authenticated;
+GRANT SELECT ON TABLE candidate_profiles TO anon, authenticated;
 GRANT SELECT ON TABLE candidate_aliases TO anon, authenticated;
 GRANT SELECT ON TABLE nominations TO anon, authenticated;

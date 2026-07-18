@@ -41,3 +41,13 @@ Set these environment variables in Netlify and in your local `.env` file:
 - `VITE_SUPABASE_ANON_KEY=sb_publishable_QSd0P22_pr2JCymO4BjapQ_qdSkD_Ni`
 
 Use `.env.example` as the template for local development.
+
+## Admin CMS Portal
+
+The Admin CMS portal uses a Netlify Function for secure write operations.
+
+Add this secret in Netlify Site settings for the function runtime:
+
+- `SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>`
+
+The browser never receives the service-role key. It is only used server-side by the Netlify Function at `/.netlify/functions/admin`.

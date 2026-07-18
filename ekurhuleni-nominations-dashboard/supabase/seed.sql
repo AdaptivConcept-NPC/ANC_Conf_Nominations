@@ -39,6 +39,19 @@ VALUES
 ON CONFLICT (full_name) DO UPDATE SET
   updated_at = CURRENT_TIMESTAMP;
 
+INSERT INTO candidate_profiles (candidate_id, display_name, status)
+VALUES
+  ((SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 'DOCTOR XHAKAZA', 'active'),
+  ((SELECT id FROM candidates WHERE full_name = 'Jean Sethato'), 'Jean Sethato', 'active'),
+  ((SELECT id FROM candidates WHERE full_name = 'Nomadlozi Nkosi'), 'Nomadlozi Nkosi', 'active'),
+  ((SELECT id FROM candidates WHERE full_name = 'Jongizwe Dlabathi'), 'Jongizwe Dlabathi', 'active'),
+  ((SELECT id FROM candidates WHERE full_name = 'Phelisa Nkunjana'), 'Phelisa Nkunjana', 'active'),
+  ((SELECT id FROM candidates WHERE full_name = 'Dora Mlambo'), 'Dora Mlambo', 'active')
+ON CONFLICT (candidate_id) DO UPDATE SET
+  display_name = EXCLUDED.display_name,
+  status = EXCLUDED.status,
+  updated_at = CURRENT_TIMESTAMP;
+
 INSERT INTO candidate_aliases (candidate_id, alias_name, source_note)
 VALUES
   ((SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 'DOCTOR XHAKZA', 'Workbook typo variant'),
