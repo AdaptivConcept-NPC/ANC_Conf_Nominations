@@ -37,7 +37,7 @@ The deployed app must use hosted Supabase values, not the local container URL.
 
 Set these environment variables in Netlify and in your local `.env` file:
 
-- `VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co`
-- `VITE_SUPABASE_ANON_KEY=<your-project-anon-key>`
+- `VITE_SUPABASE_URL=https://zilabbyqoaivtgqdeijd.supabase.co`
+- `VITE_SUPABASE_ANON_KEY=sb_publishable_QSd0P22_pr2JCymO4BjapQ_qdSkD_Ni`
 
 Use `.env.example` as the template for local development.
