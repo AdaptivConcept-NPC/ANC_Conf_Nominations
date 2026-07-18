@@ -751,6 +751,47 @@ body::before {
   padding-bottom: 8px;
 }
 
+.reference-split {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.vertical-form {
+  display: grid;
+  gap: 12px;
+}
+
+.app-user-form {
+  background: #f7f9fc;
+  border: 1px solid rgba(12, 15, 18, 0.1);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.app-user-grid {
+  grid-template-columns: 1fr;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.checkbox-label input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.list-section h4 {
+  margin-top: 0;
+}
+
 .action-row {
   display: flex;
   gap: 8px;
@@ -936,6 +977,16 @@ body::before {
   font-size: 0.82rem;
   text-transform: uppercase;
   color: #4c5869;
+}
+
+@media (max-width: 980px) {
+  .reference-split {
+    grid-template-columns: 1fr;
+  }
+
+  .app-user-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .matrix-table thead th:first-child {

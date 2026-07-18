@@ -745,32 +745,59 @@ export function AdminCmsPortal() {
                         isActive: appUserForm.isActive,
                       })
                     }}
-                    className="capture-form vertical-form"
+                    className="vertical-form app-user-form"
                   >
-                    <label>
-                      Email *
-                      <input type="email" value={appUserForm.email} onChange={(event) => setAppUserForm((current) => ({ ...current, email: event.target.value }))} required />
-                    </label>
-                    <label>
-                      Full Name *
-                      <input value={appUserForm.fullName} onChange={(event) => setAppUserForm((current) => ({ ...current, fullName: event.target.value }))} required />
-                    </label>
-                    <label>
-                      Contact Number
-                      <input value={appUserForm.contactNumber} onChange={(event) => setAppUserForm((current) => ({ ...current, contactNumber: event.target.value }))} />
-                    </label>
-                    <label>
-                      Role *
-                      <select value={appUserForm.role} onChange={(event) => setAppUserForm((current) => ({ ...current, role: event.target.value as any }))} required>
-                        <option value="Viewer">Viewer</option>
-                        <option value="Admin">Admin</option>
-                        <option value="SuperAdmin">SuperAdmin</option>
-                      </select>
-                    </label>
-                    <label className="checkbox-label">
-                      <input type="checkbox" checked={appUserForm.isActive} onChange={(event) => setAppUserForm((current) => ({ ...current, isActive: event.target.checked }))} />
-                      Active Account
-                    </label>
+                    <div className="form-grid app-user-grid">
+                      <label>
+                        Email *
+                        <input
+                          type="email"
+                          value={appUserForm.email}
+                          onChange={(event) => setAppUserForm((current) => ({ ...current, email: event.target.value }))}
+                          required
+                        />
+                      </label>
+                      <label>
+                        Full Name *
+                        <input
+                          value={appUserForm.fullName}
+                          onChange={(event) => setAppUserForm((current) => ({ ...current, fullName: event.target.value }))}
+                          required
+                        />
+                      </label>
+                      <label>
+                        Contact Number
+                        <input
+                          value={appUserForm.contactNumber}
+                          onChange={(event) => setAppUserForm((current) => ({ ...current, contactNumber: event.target.value }))}
+                        />
+                      </label>
+                      <label>
+                        Role *
+                        <select
+                          value={appUserForm.role}
+                          onChange={(event) =>
+                            setAppUserForm((current) => ({
+                              ...current,
+                              role: event.target.value as AppUserFormState['role'],
+                            }))
+                          }
+                          required
+                        >
+                          <option value="Viewer">Viewer</option>
+                          <option value="Admin">Admin</option>
+                          <option value="SuperAdmin">SuperAdmin</option>
+                        </select>
+                      </label>
+                      <label className="checkbox-label full-span">
+                        <input
+                          type="checkbox"
+                          checked={appUserForm.isActive}
+                          onChange={(event) => setAppUserForm((current) => ({ ...current, isActive: event.target.checked }))}
+                        />
+                        Active Account
+                      </label>
+                    </div>
                     <div className="action-row">
                       <button type="submit" disabled={saving === 'app_user'}>
                         {saving === 'app_user' ? 'Saving...' : 'Save User'}

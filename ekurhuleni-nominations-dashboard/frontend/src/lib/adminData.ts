@@ -354,10 +354,22 @@ export async function saveAdminRecord(payload: AdminPayload) {
     body: JSON.stringify(payload),
   })
 
-  if (!response.ok) {
-    const message = await response.text()
-    throw new Error(message || 'Failed to save admin record.')
+  let parsedBody: unknown = null
+  try {
+    parsedBody = await response.json()
+  } catch {
+    parsedBody = null
   }
 
-  return response.json() as Promise<{ ok: boolean }>
+  if (!response.ok) {
+    if (parsedBody && typeof parsedBody === 'object' && 'error' in parsedBody) {
+      const errorMessage = (parsedBody as { error?: unknown }).error
+      if (typeof errorMessage === 'string' && errorMessage.trim().length > 0) {
+        throw new Error(errorMessage)
+      }
+    }
+    throw new Error('Failed to save admin record.')
+  }
+
+  return (parsedBody as { ok: boolean }) ?? { ok: true }
 }

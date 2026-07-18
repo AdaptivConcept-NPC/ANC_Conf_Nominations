@@ -35,6 +35,27 @@ function requiredNumber(value: unknown, field: string) {
   return numeric
 }
 
+function readErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const maybeMessage = 'message' in error ? (error as { message?: unknown }).message : null
+    const maybeHint = 'hint' in error ? (error as { hint?: unknown }).hint : null
+    const maybeDetails = 'details' in error ? (error as { details?: unknown }).details : null
+
+    const messageParts = [maybeMessage, maybeHint, maybeDetails]
+      .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+
+    if (messageParts.length > 0) {
+      return messageParts.join(' | ')
+    }
+  }
+
+  return 'Failed to save admin record.'
+}
+
 export const handler = async (event: { httpMethod?: string; body?: string | null }) => {
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -146,6 +167,6 @@ export const handler = async (event: { httpMethod?: string; body?: string | null
         return json(400, { ok: false, error: 'Unknown admin resource.' })
     }
   } catch (error) {
-    return json(400, { ok: false, error: error instanceof Error ? error.message : 'Failed to save admin record.' })
+    return json(400, { ok: false, error: readErrorMessage(error) })
   }
 }
