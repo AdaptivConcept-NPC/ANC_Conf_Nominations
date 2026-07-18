@@ -57,6 +57,16 @@ CREATE TABLE IF NOT EXISTS ingestion_batches (
   error_summary TEXT
 );
 
+CREATE TABLE IF NOT EXISTS workbook_sheet_rows (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  batch_id UUID NOT NULL REFERENCES ingestion_batches(id) ON DELETE CASCADE,
+  sheet_name VARCHAR(120) NOT NULL,
+  row_index INTEGER NOT NULL CHECK (row_index >= 1),
+  row_data JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT unique_batch_sheet_row UNIQUE (batch_id, sheet_name, row_index)
+);
+
 CREATE TABLE IF NOT EXISTS nominations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   ward_id UUID NOT NULL REFERENCES wards(id) ON DELETE CASCADE,
@@ -74,6 +84,64 @@ CREATE INDEX IF NOT EXISTS idx_nominations_candidate_id ON nominations(candidate
 CREATE INDEX IF NOT EXISTS idx_wards_zone_id ON wards(zone_id);
 CREATE INDEX IF NOT EXISTS idx_candidate_profiles_zone_id ON candidate_profiles(zone_id);
 CREATE INDEX IF NOT EXISTS idx_candidate_profiles_ward_id ON candidate_profiles(ward_id);
+CREATE INDEX IF NOT EXISTS idx_workbook_sheet_rows_batch_sheet ON workbook_sheet_rows(batch_id, sheet_name);
+
+ALTER TABLE zones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candidates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candidate_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candidate_aliases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nominations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workbook_sheet_rows ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  CREATE POLICY zones_select_all ON zones FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE POLICY wards_select_all ON wards FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE POLICY candidates_select_all ON candidates FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE POLICY candidate_profiles_select_all ON candidate_profiles FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE POLICY candidate_aliases_select_all ON candidate_aliases FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE POLICY nominations_select_all ON nominations FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE POLICY workbook_sheet_rows_select_all ON workbook_sheet_rows FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 
@@ -83,3 +151,4 @@ GRANT SELECT ON TABLE candidates TO anon, authenticated;
 GRANT SELECT ON TABLE candidate_profiles TO anon, authenticated;
 GRANT SELECT ON TABLE candidate_aliases TO anon, authenticated;
 GRANT SELECT ON TABLE nominations TO anon, authenticated;
+GRANT SELECT ON TABLE workbook_sheet_rows TO anon, authenticated;

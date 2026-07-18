@@ -11,7 +11,7 @@ from supabase import Client, create_client
 
 load_dotenv()
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "http://127.0.0.1:54321")
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL", "http://127.0.0.1:54321")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 CANONICAL_NAME_MAP = {
@@ -88,6 +88,55 @@ def parse_branch_nomi(filepath: Path) -> Tuple[Dict[Tuple[str, int, str], int], 
     return dict(nomination_counts), alias_tracker
 
 
+def normalize_cell_value(value: object):
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        cleaned = normalize_whitespace(value)
+        return cleaned or None
+
+    if pd.isna(value):
+        return None
+
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except Exception:
+            return value
+
+    return value
+
+
+def trim_trailing_empty_cells(row: list[object]) -> list[object]:
+    trimmed = list(row)
+    while trimmed and trimmed[-1] is None:
+        trimmed.pop()
+    return trimmed
+
+
+def extract_workbook_sheet_rows(filepath: Path) -> list[dict]:
+    workbook = pd.read_excel(filepath, sheet_name=None, header=None)
+    sheet_rows: list[dict] = []
+
+    for sheet_name, frame in workbook.items():
+        normalized_frame = frame.where(pd.notna(frame), None)
+        for row_index, row in enumerate(normalized_frame.itertuples(index=False, name=None), start=1):
+            row_data = trim_trailing_empty_cells([normalize_cell_value(value) for value in row])
+            if not row_data:
+                continue
+
+            sheet_rows.append(
+                {
+                    "sheet_name": sheet_name,
+                    "row_index": row_index,
+                    "row_data": row_data,
+                }
+            )
+
+    return sheet_rows
+
+
 def file_checksum(filepath: Path) -> str:
     sha = hashlib.sha256()
     with filepath.open("rb") as f:
@@ -137,6 +186,22 @@ def clean_and_seed() -> None:
 
     try:
         nomination_counts, aliases = parse_branch_nomi(filepath)
+        workbook_sheet_rows = extract_workbook_sheet_rows(filepath)
+
+        upsert_rows(
+            supabase,
+            "workbook_sheet_rows",
+            (
+                {
+                    "batch_id": batch_id,
+                    "sheet_name": row["sheet_name"],
+                    "row_index": row["row_index"],
+                    "row_data": row["row_data"],
+                }
+                for row in workbook_sheet_rows
+            ),
+            on_conflict="batch_id,sheet_name,row_index",
+        )
 
         zone_names = sorted({zone for zone, _, _ in nomination_counts.keys()})
         upsert_rows(
@@ -195,6 +260,7 @@ def clean_and_seed() -> None:
         ).eq("id", batch_id).execute()
 
         print(f"Database seeding completed successfully. Batch: {batch_id}")
+        print(f"Transferred workbook rows: {len(workbook_sheet_rows)}")
         print(f"Processed nominations: {len(nomination_rows)}")
     except Exception as error:
         supabase.table("ingestion_batches").update(
