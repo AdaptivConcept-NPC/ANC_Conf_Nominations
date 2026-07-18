@@ -144,9 +144,14 @@ function App() {
     setAuthError(null)
 
     try {
+      const normalizedIdentifier = authEmail.trim().toLowerCase()
+      const authIdentifier = normalizedIdentifier.includes('@')
+        ? normalizedIdentifier
+        : `${normalizedIdentifier}@anc.local`
+
       if (authMode === 'signup') {
         const { error: signUpError } = await supabase.auth.signUp({
-          email: authEmail,
+          email: authIdentifier,
           password: authPassword,
           options: {
             data: {
@@ -162,7 +167,7 @@ function App() {
         setAuthError('Account created. Please confirm your email or sign in again if email verification is disabled.')
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: authEmail,
+          email: authIdentifier,
           password: authPassword,
         })
 
@@ -233,7 +238,7 @@ function App() {
             <div className="auth-card-head">
               <div>
                 <h2>{authMode === 'login' ? 'Sign in' : 'Create account'}</h2>
-                <p className="muted">Use your email and password. If you have a seeded bootstrap account, it will appear here once set.</p>
+                <p className="muted">Use your email or username and password. If you have a seeded bootstrap account, it will appear here once set.</p>
               </div>
               <button type="button" className="secondary-button auth-switch" onClick={() => setAuthMode((current) => (current === 'login' ? 'signup' : 'login'))}>
                 {authMode === 'login' ? 'Need an account?' : 'Back to sign in'}
@@ -241,8 +246,15 @@ function App() {
             </div>
             <div className="auth-form-grid">
               <label>
-                Email
-                <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" placeholder="name@example.com" required />
+                Email or Username
+                <input
+                  type="text"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  autoComplete="username"
+                  placeholder="name@example.com or username"
+                  required
+                />
               </label>
               <label>
                 Password
