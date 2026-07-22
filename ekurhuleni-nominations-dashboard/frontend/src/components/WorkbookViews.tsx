@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import type { CSSProperties } from 'react'
-import { Printer, Layers, Share2 } from 'lucide-react'
+import { Printer, Layers, Share2, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -23,9 +23,9 @@ type WorkbookViewsProps = {
   zones: ZoneOption[]
 }
 
-type TabKey = 'BRANCH NOMINATIONS' | 'TOTAL IN ZONES' | 'VOTE DISTRIBUTION PER ZONE' | 'OVERAL SHARE' | 'PARETO GRAPH'
+type TabKey = 'BRANCH NOMINATIONS' | 'TOTAL IN ZONES' | 'VOTE DISTRIBUTION PER ZONE' | 'OVERALL SHARE' | 'PARETO GRAPH'
 
-const TABS: TabKey[] = ['BRANCH NOMINATIONS', 'TOTAL IN ZONES', 'VOTE DISTRIBUTION PER ZONE', 'OVERAL SHARE', 'PARETO GRAPH']
+const TABS: TabKey[] = ['BRANCH NOMINATIONS', 'TOTAL IN ZONES', 'VOTE DISTRIBUTION PER ZONE', 'OVERALL SHARE', 'PARETO GRAPH']
 const EXCEL_COLORS = [
   '#4472C4', '#ED7D31', '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47',
   '#264478', '#9E480E', '#636363', '#997300', '#255E91', '#43682B'
@@ -90,6 +90,65 @@ function renderPiePercentLabel({
     >
       {`${(percent * 100).toFixed(0)}%`}
     </text>
+  )
+}
+
+function renderPieNamePercentLabel({
+  cx,
+  cy,
+  midAngle,
+  outerRadius,
+  percent,
+  name,
+}: {
+  cx?: number
+  cy?: number
+  midAngle?: number
+  outerRadius?: number
+  percent?: number
+  name?: string
+}) {
+  if (
+    cx === undefined ||
+    cy === undefined ||
+    midAngle === undefined ||
+    outerRadius === undefined ||
+    percent === undefined ||
+    percent < 0.05
+  ) {
+    return null
+  }
+
+  const RADIAN = Math.PI / 180
+  const radius = outerRadius + 20
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+
+  return (
+    <g>
+      <text
+        x={x}
+        y={y - 6}
+        fill="#1f242c"
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        fontSize={11}
+        fontWeight={700}
+      >
+        {name}
+      </text>
+      <text
+        x={x}
+        y={y + 8}
+        fill="#1f242c"
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        fontSize={10}
+        fontWeight={600}
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    </g>
   )
 }
 
@@ -174,7 +233,7 @@ function DistributionLegend({
   const total = data.reduce((sum, row) => sum + row.value, 0)
 
   if (showRanking) {
-    const COLUMN_SIZE = 5
+    const COLUMN_SIZE = 6
     const leaderboardColumns: Array<Array<{ label: string; value: number }>> = []
     for (let index = 0; index < sortedData.length; index += COLUMN_SIZE) {
       leaderboardColumns.push(sortedData.slice(index, index + COLUMN_SIZE))
@@ -228,6 +287,8 @@ function DistributionLegend({
 
 function BranchNomiView({ records }: { records: NominationRecord[] }) {
   const [matrixDirection, setMatrixDirection] = useState<'ward-rows' | 'candidate-rows'>('ward-rows')
+  const [sortBy, setSortBy] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const candidateTotals = useMemo(() => aggregateByCandidate(records), [records])
   const candidates = candidateTotals.map((row) => row.candidate)
   const wardCandidateMap = useMemo(() => aggregateByWardCandidate(records), [records])
@@ -260,7 +321,7 @@ function BranchNomiView({ records }: { records: NominationRecord[] }) {
 
   const [chartDirection, setChartDirection] = useState<'ward-y' | 'candidate-y'>('ward-y')
 
-  // Helper function for conditional cell formatting
+  // Helper function for conditional cell formatting (binary votes)
   const getCellStyle = (value: number): CSSProperties => {
     if (value > 1) {
       // Red pastel for values > 1
@@ -272,6 +333,188 @@ function BranchNomiView({ records }: { records: NominationRecord[] }) {
     }
     // No formatting for 0
     return {}
+  }
+
+  // Heat-map color function for totals (light→medium→dark blue gradient with solid fills)
+  const getHeatmapColor = (value: number, maxValue: number): CSSProperties => {
+    if (value === 0) return { backgroundColor: '#fff' }
+    
+    const ratio = maxValue > 0 ? value / maxValue : 0
+    let backgroundColor: string
+    
+    if (ratio < 0.33) {
+      // Light blue range (0-33%) - solid
+      const intensity = ratio / 0.33
+      const lightness = Math.round(230 - intensity * 20)
+      backgroundColor = `rgb(${lightness}, ${lightness + 10}, 255)`
+    } else if (ratio < 0.67) {
+      // Medium blue range (33-67%) - solid
+      const intensity = (ratio - 0.33) / 0.34
+      const shade = Math.round(180 - intensity * 50)
+      backgroundColor = `rgb(${shade}, ${shade + 40}, 255)`
+    } else {
+      // Dark blue range (67-100%) - solid
+      const intensity = (ratio - 0.67) / 0.33
+      const shade = Math.round(120 - intensity * 60)
+      backgroundColor = `rgb(${shade}, ${shade + 60}, 255)`
+    }
+    
+    return { backgroundColor, fontWeight: 600, color: ratio > 0.65 ? '#fff' : '#000' }
+  }
+
+  // Calculate totals for each column and row
+  const totalsRow = useMemo(() => {
+    const totals = new Map<string, number>()
+    if (matrixDirection === 'ward-rows') {
+      // Ward-rows: sum each candidate across all wards
+      for (const candidate of candidates) {
+        let sum = 0
+        for (const { candidateMap } of matrixRows) {
+          sum += candidateMap.get(candidate) ?? 0
+        }
+        totals.set(candidate, sum)
+      }
+    } else {
+      // Candidate-rows: sum each ward across all candidates
+      for (const { ward, candidateMap } of matrixRows) {
+        let sum = 0
+        for (const candidate of candidates) {
+          sum += candidateMap.get(candidate) ?? 0
+        }
+        totals.set(`Ward ${ward}`, sum)
+      }
+    }
+    return totals
+  }, [matrixDirection, matrixRows, candidates])
+
+  // Calculate row totals for each row
+  const rowTotals = useMemo(() => {
+    const totals = new Map<string, number>()
+    if (matrixDirection === 'ward-rows') {
+      for (const { ward, candidateMap } of matrixRows) {
+        let sum = 0
+        for (const candidate of candidates) {
+          sum += candidateMap.get(candidate) ?? 0
+        }
+        totals.set(`Ward ${ward}`, sum)
+      }
+    } else {
+      for (const candidate of candidates) {
+        let sum = 0
+        for (const { candidateMap } of matrixRows) {
+          sum += candidateMap.get(candidate) ?? 0
+        }
+        totals.set(candidate, sum)
+      }
+    }
+    return totals
+  }, [matrixDirection, matrixRows, candidates])
+
+  // Get max values for heat-map scaling
+  const maxColumnTotal = useMemo(
+    () => Math.max(...Array.from(totalsRow.values())),
+    [totalsRow]
+  )
+  const maxRowTotal = useMemo(
+    () => Math.max(...Array.from(rowTotals.values())),
+    [rowTotals]
+  )
+
+  // Sorted matrix rows with safe column sorting
+  const sortedMatrixRows = useMemo(() => {
+    let sorted = [...matrixRows]
+    if (sortBy && sortBy !== 'label') {
+      sorted.sort((a, b) => {
+        let aVal: number, bVal: number
+        if (sortBy === 'row-total') {
+          const labelA = matrixDirection === 'ward-rows' ? `Ward ${a.ward}` : a.ward.toString()
+          const labelB = matrixDirection === 'ward-rows' ? `Ward ${b.ward}` : b.ward.toString()
+          aVal = rowTotals.get(labelA) ?? 0
+          bVal = rowTotals.get(labelB) ?? 0
+        } else {
+          aVal = a.candidateMap.get(sortBy) ?? 0
+          bVal = b.candidateMap.get(sortBy) ?? 0
+        }
+        return sortDir === 'desc' ? bVal - aVal : aVal - bVal
+      })
+    }
+    return sorted
+  }, [matrixRows, sortBy, sortDir, matrixDirection, rowTotals])
+
+  // Sorted candidates with safe column sorting
+  const sortedCandidates = useMemo(() => {
+    let sorted = [...candidates]
+    if (sortBy && sortBy !== 'label' && matrixDirection === 'candidate-rows') {
+      sorted.sort((candidate) => {
+        if (sortBy === 'row-total') {
+          return sortDir === 'desc'
+            ? (rowTotals.get(candidate) ?? 0)
+            : -(rowTotals.get(candidate) ?? 0)
+        }
+        return 0
+      })
+    } else if (sortBy && sortBy !== 'label' && sortBy !== 'row-total' && matrixDirection === 'candidate-rows') {
+      const wardNum = parseInt(sortBy.replace('Ward ', ''), 10)
+      sorted.sort((a, b) => {
+        const aVal = wardCandidateMap.get(wardNum)?.get(a) ?? 0
+        const bVal = wardCandidateMap.get(wardNum)?.get(b) ?? 0
+        return sortDir === 'desc' ? bVal - aVal : aVal - bVal
+      })
+    }
+    return sorted
+  }, [candidates, sortBy, sortDir, matrixDirection, rowTotals, wardCandidateMap])
+
+  // Handler for sort button clicks
+  const handleSort = (columnName: string) => {
+    if (sortBy === columnName) {
+      setSortDir(sortDir === 'desc' ? 'asc' : 'desc')
+    } else {
+      setSortBy(columnName)
+      setSortDir('desc')
+    }
+  }
+
+  // Render sort indicator
+  const SortIndicator = ({ column }: { column: string }) => {
+    if (sortBy !== column) {
+      return <ChevronsUpDown size={14} style={{ opacity: 0.3, marginLeft: '4px' }} />
+    }
+    return sortDir === 'desc' ? (
+      <ArrowDown size={14} style={{ marginLeft: '4px' }} />
+    ) : (
+      <ArrowUp size={14} style={{ marginLeft: '4px' }} />
+    )
+  }
+
+  // Sticky header and totals row styles
+  const stickyHeaderStyle: CSSProperties = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    backgroundColor: '#fff',
+    borderBottom: '2px solid #ddd',
+  }
+
+  const totalsRowStyle: CSSProperties = {
+    backgroundColor: '#f5f5f5',
+    fontWeight: 700,
+    borderTop: '2px solid #ddd',
+    borderBottom: '2px solid #ddd',
+    textAlign: 'center',
+  }
+
+  const stickyFirstColStyle: CSSProperties = {
+    position: 'sticky',
+    left: 0,
+    zIndex: 9,
+    backgroundColor: '#fff',
+  }
+
+  const totalsColStyle: CSSProperties = {
+    position: 'sticky',
+    left: 80,
+    zIndex: 9,
+    backgroundColor: '#fff',
   }
 
   if (records.length === 0) {
@@ -298,52 +541,100 @@ function BranchNomiView({ records }: { records: NominationRecord[] }) {
         </div>
         <div className="matrix-wrap" style={{ overflowX: 'auto', maxWidth: '100%' }}>
           <table className="matrix-table" style={{ minWidth: 'max-content' }}>
-            <thead>
+            <thead style={stickyHeaderStyle}>
               {matrixDirection === 'ward-rows' ? (
                 <tr>
-                  <th>Ward</th>
+                  <th style={stickyFirstColStyle}>Ward</th>
+                  <th style={{ ...totalsColStyle, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }} onClick={() => handleSort('row-total')}>
+                    Totals <SortIndicator column="row-total" />
+                  </th>
                   {candidates.map((candidate) => (
-                    <th key={candidate}>{candidate}</th>
+                    <th key={candidate} onClick={() => handleSort(candidate)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                      {candidate} <SortIndicator column={candidate} />
+                    </th>
                   ))}
                 </tr>
               ) : (
                 <tr>
-                  <th>Candidate</th>
-                  {matrixRows.map(({ ward }) => (
-                    <th key={ward}>Ward {ward}</th>
+                  <th style={stickyFirstColStyle}>Candidate</th>
+                  <th style={{ ...totalsColStyle, userSelect: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('row-total')}>
+                    Totals <SortIndicator column="row-total" />
+                  </th>
+                  {sortedMatrixRows.map(({ ward }) => (
+                    <th key={ward} onClick={() => handleSort(`Ward ${ward}`)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                      Ward {ward} <SortIndicator column={`Ward ${ward}`} />
+                    </th>
                   ))}
                 </tr>
               )}
             </thead>
             <tbody>
+              {/* Totals row with heat-map */}
+              <tr style={totalsRowStyle}>
+                <td style={stickyFirstColStyle}>TOTALS</td>
+                <td style={{ ...totalsColStyle, ...getHeatmapColor(Array.from(totalsRow.values()).reduce((a, b) => a + b, 0), maxColumnTotal * candidates.length) }}>
+                  {Array.from(totalsRow.values()).reduce((a, b) => a + b, 0)}
+                </td>
+                {matrixDirection === 'ward-rows'
+                  ? candidates.map((candidate) => {
+                      const colTotal = totalsRow.get(candidate) ?? 0
+                      return (
+                        <td key={`total-${candidate}`} style={getHeatmapColor(colTotal, maxColumnTotal)}>
+                          {colTotal}
+                        </td>
+                      )
+                    })
+                  : sortedMatrixRows.map(({ ward }) => {
+                      const colTotal = totalsRow.get(`Ward ${ward}`) ?? 0
+                      return (
+                        <td key={`total-ward-${ward}`} style={getHeatmapColor(colTotal, maxColumnTotal)}>
+                          {colTotal}
+                        </td>
+                      )
+                    })}
+              </tr>
+
+              {/* Data rows */}
               {matrixDirection === 'ward-rows' ? (
-                matrixRows.map(({ ward, candidateMap }) => (
-                  <tr key={ward}>
-                    <td>Ward {ward}</td>
-                    {candidates.map((candidate) => {
-                      const value = candidateMap.get(candidate) ?? 0
-                      return (
-                        <td key={`${ward}-${candidate}`} style={getCellStyle(value)}>
-                          {value}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))
+                sortedMatrixRows.map(({ ward, candidateMap }) => {
+                  const rowTotal = rowTotals.get(`Ward ${ward}`) ?? 0
+                  return (
+                    <tr key={ward}>
+                      <td style={stickyFirstColStyle}>Ward {ward}</td>
+                      <td style={{ ...totalsColStyle, ...getHeatmapColor(rowTotal, maxRowTotal) }}>
+                        {rowTotal}
+                      </td>
+                      {candidates.map((candidate) => {
+                        const value = candidateMap.get(candidate) ?? 0
+                        return (
+                          <td key={`${ward}-${candidate}`} style={getCellStyle(value)}>
+                            {value}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })
               ) : (
-                candidates.map((candidate) => (
-                  <tr key={candidate}>
-                    <td>{candidate}</td>
-                    {matrixRows.map(({ ward, candidateMap }) => {
-                      const value = candidateMap.get(candidate) ?? 0
-                      return (
-                        <td key={`${ward}-${candidate}`} style={getCellStyle(value)}>
-                          {value}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))
+                sortedCandidates.map((candidate) => {
+                  const rowTotal = rowTotals.get(candidate) ?? 0
+                  return (
+                    <tr key={candidate}>
+                      <td style={stickyFirstColStyle}>{candidate}</td>
+                      <td style={{ ...totalsColStyle, ...getHeatmapColor(rowTotal, maxRowTotal) }}>
+                        {rowTotal}
+                      </td>
+                      {sortedMatrixRows.map(({ ward, candidateMap }) => {
+                        const value = candidateMap.get(candidate) ?? 0
+                        return (
+                          <td key={`${ward}-${candidate}`} style={getCellStyle(value)}>
+                            {value}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -427,6 +718,7 @@ function TotalInZonesView({ records }: { records: NominationRecord[] }) {
   return (
     <section className="sheet-grid single">
       <div className="sheet-grid two-up">
+        {/* votes per zone */}
         <article className="panel" style={{ maxWidth: '100%', overflow: 'hidden' }}>
           <h2>Votes per Zone</h2>
           <div className="chart-surface" style={{ height: Math.max(400, zoneTotals.length * 32) }}>
@@ -464,6 +756,7 @@ function TotalInZonesView({ records }: { records: NominationRecord[] }) {
           </div>
         </article>
 
+        {/* votes per candidate */}
         <article className="panel" style={{ maxWidth: '100%', overflow: 'hidden' }}>
           <h2>Votes per Candidate</h2>
           <div className="chart-surface" style={{ height: Math.max(400, candidateTotals.length * 32) }}>
@@ -598,7 +891,9 @@ function PiePerZoneView({ records, zones }: { records: NominationRecord[]; zones
 
       <article className="panel">
         <h2>Candidate Leaderboard in Zone: ({activeZone})</h2>
-        <DistributionLegend data={pieData} labelKey="candidate" showRanking />
+        <div className="top-candidates-container">
+          <DistributionLegend data={pieData} labelKey="candidate" showRanking />
+        </div>
       </article>
     </section>
   )
@@ -608,7 +903,19 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
   const candidateTotals = useMemo(() => aggregateByCandidate(records), [records])
   const pieData = candidateTotals.map((row) => ({ label: row.candidate, value: row.votes }))
   const totalVotes = pieData.reduce((sum, row) => sum + row.value, 0)
-  const topCandidate = candidateTotals[0]
+  
+  // Get top 6 candidates with zone and ward info
+  const top6CandidatesWithLocation = useMemo(() => {
+    return candidateTotals.slice(0, 6).map((candidate) => {
+      // Find first record for this candidate to get zone and ward
+      const candidateRecord = records.find((r) => r.candidateName === candidate.candidate)
+      return {
+        ...candidate,
+        zone: candidateRecord?.zoneName ?? 'N/A',
+        ward: candidateRecord?.wardNumber ?? 'N/A',
+      }
+    })
+  }, [candidateTotals, records])
 
   return (
     <section className="sheet-grid two-up">
@@ -624,7 +931,7 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
                 outerRadius={96}
                 innerRadius={44}
                 labelLine={false}
-                label={renderPiePercentLabel}
+                label={renderPieNamePercentLabel}
               >
                 {pieData.map((entry, index) => (
                   <Cell key={entry.label} fill={STACK_COLORS[index % STACK_COLORS.length]} />
@@ -633,6 +940,30 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
               <Tooltip formatter={(value) => [`${value} votes`, 'Votes']} />
             </PieChart>
           </ResponsiveContainer>
+        </div>
+        
+        {/* Top 6 Candidates Grid */}
+        <div className="top-candidates-container">
+          <h3 style={{ margin: '16px 0 12px 0', fontSize: '1rem', fontWeight: 600 }}>Top 6 Candidates</h3>
+          <ol className="top-candidates-list">
+            {top6CandidatesWithLocation.map((candidate, idx) => {
+              const pct = totalVotes > 0 ? (candidate.votes / totalVotes) * 100 : 0
+              return (
+                <li key={candidate.candidate} className="top-candidate-item">
+                  <div className="candidate-card" data-rank={idx + 1}>
+                    <div className="candidate-rank-badge">{idx + 1}</div>
+                    <div className="candidate-main">
+                      <span className="candidate-name">{candidate.candidate}</span>
+                      <span className="candidate-votes">{candidate.votes} votes ({pct.toFixed(1)}%)</span>
+                    </div>
+                    <div className="candidate-meta">
+                      <span className="zone-ward-label">Zone {candidate.zone} • Ward {candidate.ward}</span>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
         </div>
       </article>
 
@@ -647,17 +978,9 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
             <p>Total Candidates</p>
             <strong>{candidateTotals.length}</strong>
           </div>
-          <div>
-            <p>Top Candidate</p>
-            <strong>{topCandidate?.candidate ?? '-'}</strong>
-          </div>
-          <div>
-            <p>Top Candidate Share</p>
-            <strong>{topCandidate ? ((topCandidate.votes / totalVotes) * 100).toFixed(1) : '0.0'}%</strong>
-          </div>
         </div>
         <hr />
-        <DistributionLegend data={pieData} labelKey="candidate" />
+        <DistributionLegend data={pieData} labelKey="candidate" showRanking />
       </article>
     </section>
   )
@@ -874,9 +1197,9 @@ export function WorkbookViews({ records, zones }: WorkbookViewsProps) {
       <nav 
         className="sheet-tabs" 
         aria-label="Workbook pages" 
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', margin: '24px 0', paddingRight: '8px', gap: '4px' }}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', margin: '24px 0', paddingRight: '8px' }}
       >
-        <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
           {TABS.map((tab) => (
             <button
               key={tab}
@@ -922,7 +1245,7 @@ export function WorkbookViews({ records, zones }: WorkbookViewsProps) {
       {(isPrintingAll || activeTab === 'BRANCH NOMINATIONS') && <BranchNomiView records={records} />}
       {(isPrintingAll || activeTab === 'TOTAL IN ZONES') && <TotalInZonesView records={records} />}
       {(isPrintingAll || activeTab === 'VOTE DISTRIBUTION PER ZONE') && <PiePerZoneView records={records} zones={zones} />}
-      {(isPrintingAll || activeTab === 'OVERAL SHARE') && <OveralPieView records={records} />}
+      {(isPrintingAll || activeTab === 'OVERALL SHARE') && <OveralPieView records={records} />}
       {(isPrintingAll || activeTab === 'PARETO GRAPH') && <OveralGraphView records={records} />}
     </section>
   )
