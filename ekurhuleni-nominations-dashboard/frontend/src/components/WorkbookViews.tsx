@@ -260,6 +260,20 @@ function BranchNomiView({ records }: { records: NominationRecord[] }) {
 
   const [chartDirection, setChartDirection] = useState<'ward-y' | 'candidate-y'>('ward-y')
 
+  // Helper function for conditional cell formatting
+  const getCellStyle = (value: number): CSSProperties => {
+    if (value > 1) {
+      // Red pastel for values > 1
+      return { backgroundColor: '#FFB3B3', fontWeight: 600 }
+    }
+    if (value > 0) {
+      // Pastel green for values > 0 and <= 1
+      return { backgroundColor: '#B3E5B3', fontWeight: 600 }
+    }
+    // No formatting for 0
+    return {}
+  }
+
   if (records.length === 0) {
     return <section className="panel"><p className="muted">No records available for BRANCH NOMINATIONS.</p></section>
   }
@@ -306,18 +320,28 @@ function BranchNomiView({ records }: { records: NominationRecord[] }) {
                 matrixRows.map(({ ward, candidateMap }) => (
                   <tr key={ward}>
                     <td>Ward {ward}</td>
-                    {candidates.map((candidate) => (
-                      <td key={`${ward}-${candidate}`}>{candidateMap.get(candidate) ?? 0}</td>
-                    ))}
+                    {candidates.map((candidate) => {
+                      const value = candidateMap.get(candidate) ?? 0
+                      return (
+                        <td key={`${ward}-${candidate}`} style={getCellStyle(value)}>
+                          {value}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))
               ) : (
                 candidates.map((candidate) => (
                   <tr key={candidate}>
                     <td>{candidate}</td>
-                    {matrixRows.map(({ ward, candidateMap }) => (
-                      <td key={`${ward}-${candidate}`}>{candidateMap.get(candidate) ?? 0}</td>
-                    ))}
+                    {matrixRows.map(({ ward, candidateMap }) => {
+                      const value = candidateMap.get(candidate) ?? 0
+                      return (
+                        <td key={`${ward}-${candidate}`} style={getCellStyle(value)}>
+                          {value}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))
               )}
@@ -850,7 +874,7 @@ export function WorkbookViews({ records, zones }: WorkbookViewsProps) {
       <nav 
         className="sheet-tabs" 
         aria-label="Workbook pages" 
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', margin: '24px 0', paddingRight: '8px' }}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', margin: '24px 0', paddingRight: '8px', gap: '4px' }}
       >
         <div style={{ display: 'flex', flexWrap: 'wrap' }}>
           {TABS.map((tab) => (
