@@ -65,236 +65,68 @@ export async function downloadVotingTemplate(
     wards: VotingTemplateWard[],
     activeCandidates: VotingTemplateCandidate[],
 ): Promise<void> {
-    const workbook = new ExcelJS.Workbook()
-    workbook.creator = 'ANC Ekurhuleni Nominations System'
-    workbook.created = new Date()
+    try {
+        const workbook = new ExcelJS.Workbook()
+        workbook.creator = 'ANC Ekurhuleni Nominations System'
+        workbook.created = new Date()
 
-    // -----------------------------------------------------------------------
-    // Instructions sheet
-    // -----------------------------------------------------------------------
-    const instructionsSheet = workbook.addWorksheet('Instructions')
-    instructionsSheet.getColumn(1).width = 90
+        // -----------------------------------------------------------------------
+        // Votes sheet — pivot format: candidates as rows, wards as columns + sum
+        // -----------------------------------------------------------------------
+        const votesSheet = workbook.addWorksheet('Votes')
 
-    const instructionLines: Array<[string, boolean]> = [
-        ['ANC Ekurhuleni BGM 2026 — Voting Nominations Template', true],
-        ['', false],
-        ['HOW TO USE THIS TEMPLATE', true],
-        ['1. Use the "Votes" sheet to capture nomination results.', false],
-        ['2. Each row represents one candidate in one ward.', false],
-        ['3. Set Vote (0 or 1) to 1 if the candidate received a vote from that ward, or 0 if not.', false],
-        ['4. Upload the completed file via the Admin CMS → Report tab → Bulk Upload.', false],
-        ['', false],
-        ['AUTHORITATIVE VOTING RULES', true],
-        ['Rule 1 — Six Votes Per Branch:', true],
-        ['  Each Ward/Branch may cast at most 6 votes across all candidates.', false],
-        ['  Fewer than 6 votes is permitted (partial allocation).', false],
-        ['  More than 6 votes is rejected.', false],
-        ['', false],
-        ['Rule 2 — One Vote Per Candidate Per Branch:', true],
-        ['  A candidate may receive at most 1 vote from any single ward.', false],
-        ['  The Vote column must be 0 or 1 — no other values.', false],
-        ['', false],
-        ['Rule 3 — Candidate Score = SUM Across All Branches:', true],
-        ['  A candidate\'s total score is the sum of their votes across all wards.', false],
-        ['', false],
-        ['IMPORTANT — DO NOT MODIFY COLUMN HEADERS', true],
-        ['  The upload parser requires columns: Ward Number | Candidate Full Name | Vote (0 or 1)', false],
-        ['  Candidate names must match the system exactly (use the dropdown provided).', false],
-        ['', false],
-        ['DATA QUALITY NOTICE', true],
-        ['  The initial data transferred to the system contained errors (vote_count > 1 per ward/candidate).', false],
-        ['  All wards must be re-submitted using this template to ensure accurate totals.', false],
-    ]
+        // Sort wards by ward number for consistent column order
+        const sortedWards = [...wards].sort((a, b) => a.wardNumber - b.wardNumber)
 
-    for (const [text, bold] of instructionLines) {
-        const row = instructionsSheet.addRow([text])
-        if (bold) {
-            row.getCell(1).font = { bold: true, size: 11 }
+        // Build header row: Candidate Full Name | Sum | Ward 1 | Ward 2 | ... | Ward N
+        const wardHeaders = sortedWards.map((w) => `Ward ${w.wardNumber}`)
+        votesSheet.addRow(['Candidate Full Name', 'Sum', ...wardHeaders])
+
+        // Add data rows: one row per candidate
+        const dataStartRow = 2
+        for (let i = 0; i < activeCandidates.length; i++) {
+            const candidate = activeCandidates[i]
+            const dataRowIndex = dataStartRow + i
+            const colLetterStart = String.fromCharCode(67) // 'C'
+            const colLetterEnd = String.fromCharCode(66 + sortedWards.length) // Last ward column
+            
+            // Build row data with candidate name and ward columns filled with 0
+            const rowData: any[] = [
+                candidate.fullName, // Column A: Candidate name
+                // Column B: Sum (will be set as formula)
+                ...Array(sortedWards.length).fill(0), // Columns C onwards: 0 for each ward
+            ]
+            const row = votesSheet.addRow(rowData)
+            
+            // Set the Sum formula in column B after row is created
+            const sumCell = row.getCell(2)
+            sumCell.value = `=SUM(${colLetterStart}${dataRowIndex}:${colLetterEnd}${dataRowIndex})`
         }
-    }
 
-    // -----------------------------------------------------------------------
-    // Votes sheet — pivot format: candidates as rows, wards as columns + sum
-    // -----------------------------------------------------------------------
-    const votesSheet = workbook.addWorksheet('Votes')
+        // Set column widths
+        votesSheet.getColumn(1).width = 36 // Candidate Full Name
+        votesSheet.getColumn(2).width = 10 // Sum
+        for (let i = 0; i < sortedWards.length; i++) {
+            votesSheet.getColumn(3 + i).width = 12 // Ward columns
+        }
 
-    // Sort wards by ward number for consistent column order
-    const sortedWards = [...wards].sort((a, b) => a.wardNumber - b.wardNumber)
-
-    // Build header row: Candidate Full Name | Sum | Ward 1 | Ward 2 | ... | Ward N
-    const wardHeaders = sortedWards.map((w) => `Ward ${w.wardNumber}`)
-    const headerRow = votesSheet.addRow(['Candidate Full Name', 'Sum', ...wardHeaders])
-
-    // Style header row (dark green background, white text, bold)
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
-    headerRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF006400' },
-    }
-
-    // Add data rows: one row per candidate
-    const dataStartRow = 2
-    let dataRowIndex = dataStartRow
-
-    for (const candidate of activeCandidates) {
-        const colLetterStart = String.fromCharCode(67) // 'C'
-        const colLetterEnd = String.fromCharCode(66 + sortedWards.length) // Last ward column
-        const rowData: Array<string | number | { formula: string }> = [
-            candidate.fullName, // Column A: Candidate name
-            { formula: `=SUM(${colLetterStart}${dataRowIndex}:${colLetterEnd}${dataRowIndex})` }, // Column B: Sum formula
-            ...Array(sortedWards.length).fill(0), // Columns C onwards: 0 for each ward
-        ]
-        votesSheet.addRow(rowData)
-        dataRowIndex++
-    }
-
-    const lastDataRow = dataRowIndex - 1
-
-    // Set column widths
-    votesSheet.getColumn(1).width = 36 // Candidate Full Name
-    votesSheet.getColumn(2).width = 10 // Sum
-    for (let i = 0; i < sortedWards.length; i++) {
-        votesSheet.getColumn(3 + i).width = 12 // Ward columns
-    }
-
-    // Data validation — Ward columns: allow only 0 or 1
-    const ws = votesSheet as unknown as { dataValidations: { add: (ref: string, rules: Record<string, unknown>) => void } }
-
-    for (let wardIdx = 0; wardIdx < sortedWards.length; wardIdx++) {
-        const colLetter = String.fromCharCode(67 + wardIdx) // C, D, E, etc.
-        const range = `${colLetter}${dataStartRow}:${colLetter}${lastDataRow}`
-
-        ws.dataValidations.add(range, {
-            type: 'list',
-            allowBlank: false,
-            formulae: ['"0,1"'],
-            showErrorMessage: true,
-            errorStyle: 'stop',
-            errorTitle: 'Invalid vote value',
-            error: 'Vote must be 0 (no vote) or 1 (voted).',
+        // -----------------------------------------------------------------------
+        // Trigger download in the browser
+        // -----------------------------------------------------------------------
+        const buffer = await workbook.xlsx.writeBuffer()
+        const blob = new Blob([buffer], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         })
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `ANC_Nominations_Template_${new Date().toISOString().slice(0, 10)}.xlsx`
+        anchor.click()
+        URL.revokeObjectURL(url)
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        throw new Error(`Template generation failed: ${errorMsg}`)
     }
-
-    // Add an Excel Table so the data is filterable
-    // Add an Excel Table so the data is filterable
-    if (lastDataRow >= dataStartRow) {
-        const lastColLetter = String.fromCharCode(66 + sortedWards.length) // Last column
-            ; (votesSheet as any).addTable({
-                name: 'VotesTable',
-                ref: `A1:${lastColLetter}${lastDataRow}`,
-                headerRow: true,
-                style: {
-                    theme: 'TableStyleMedium7',
-                    showRowStripes: true,
-                },
-                columns: [
-                    { name: 'Candidate Full Name', filterButton: true },
-                    { name: 'Sum', filterButton: true },
-                    ...wardHeaders.map((h) => ({ name: h, filterButton: true })),
-                ],
-            })
-    }
-
-    /* // -----------------------------------------------------------------------
-    // Votes sheet — long/tall table, one row per ward+candidate combo
-    // -----------------------------------------------------------------------
-    const votesSheet = workbook.addWorksheet('Votes')
-  
-    // Build all rows: every candidate × every ward = full cross-product (user fills in 0/1).
-    const headers = ['Ward Number', 'Candidate Full Name', 'Vote (0 or 1)']
-    votesSheet.addRow(headers)
-  
-    const headerRow = votesSheet.getRow(1)
-    headerRow.font = { bold: true }
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF006400' },
-    }
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
-  
-    // Add data rows: sorted wards, then candidates.
-    const sortedWards = [...wards].sort((a, b) => a.wardNumber - b.wardNumber)
-    const dataStartRow = 2
-  
-    for (const ward of sortedWards) {
-      for (const candidate of activeCandidates) {
-        votesSheet.addRow([ward.wardNumber, candidate.fullName, 0])
-      }
-    }
-  
-    const lastDataRow = 1 + sortedWards.length * activeCandidates.length
-  
-    // Column widths.
-    votesSheet.getColumn(1).width = 14
-    votesSheet.getColumn(2).width = 36
-    votesSheet.getColumn(3).width = 16
-  
-    // Data validation — Vote column: allow only 0 or 1.
-    // Cast to any: exceljs runtime supports dataValidations but TS types vary by version.
-    const ws = votesSheet as unknown as { dataValidations: { add: (ref: string, rules: Record<string, unknown>) => void } }
-    if (lastDataRow >= dataStartRow) {
-      ws.dataValidations.add(`C${dataStartRow}:C${lastDataRow}`, {
-        type: 'list',
-        allowBlank: false,
-        formulae: ['"0,1"'],
-        showErrorMessage: true,
-        errorStyle: 'stop',
-        errorTitle: 'Invalid vote value',
-        error: 'Vote must be 0 (no vote) or 1 (voted).',
-      })
-  
-      // Data validation — Candidate column: list of active candidate names.
-      const candidateNamesCsv = activeCandidates.map((c) => c.fullName).join(',')
-      if (candidateNamesCsv.length <= 255) {
-        // Excel inline list limit is 255 chars; fall back gracefully if it exceeds that.
-        ws.dataValidations.add(`B${dataStartRow}:B${lastDataRow}`, {
-          type: 'list',
-          allowBlank: false,
-          formulae: [`"${candidateNamesCsv}"`],
-          showErrorMessage: true,
-          errorStyle: 'warning',
-          errorTitle: 'Unrecognised candidate',
-          error: 'This candidate name does not match a registered active candidate.',
-        })
-      }
-    }
-  
-    // Add an Excel Table so the data is filterable.
-    if (lastDataRow >= dataStartRow) {
-      votesSheet.addTable({
-        name: 'VotesTable',
-        ref: `A1:C${lastDataRow}`,
-        headerRow: true,
-        style: {
-          theme: 'TableStyleMedium7',
-          showRowStripes: true,
-        },
-        columns: [
-          { name: 'Ward Number', filterButton: true },
-          { name: 'Candidate Full Name', filterButton: true },
-          { name: 'Vote (0 or 1)', filterButton: true },
-        ],
-        rows: sortedWards.flatMap((ward) =>
-          activeCandidates.map((c) => [ward.wardNumber, c.fullName, 0]),
-        ),
-      })
-    } */
-
-    // -----------------------------------------------------------------------
-    // Trigger download in the browser
-    // -----------------------------------------------------------------------
-    const buffer = await workbook.xlsx.writeBuffer()
-    const blob = new Blob([buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `ANC_Nominations_Template_${new Date().toISOString().slice(0, 10)}.xlsx`
-    anchor.click()
-    URL.revokeObjectURL(url)
 }
 
 // ---------------------------------------------------------------------------

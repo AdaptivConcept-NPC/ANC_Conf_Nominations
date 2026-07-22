@@ -120,6 +120,7 @@ export function AdminCmsPortal() {
   const [error, setError] = useState<string | null>(null)
   const [activeView, setActiveView] = useState<'profiles' | 'references' | 'report' | 'users'>('profiles')
   const [activeReferenceView, setActiveReferenceView] = useState<'zones' | 'wards' | 'candidates' | 'aliases'>('zones')
+  const [activeReportView, setActiveReportView] = useState<'bulk-upload' | 'manual-ballot'>('bulk-upload')
 
   // Voting / Report tab state
   const [activeCandidates, setActiveCandidates] = useState<VotingTemplateCandidate[]>([])
@@ -179,13 +180,17 @@ export function AdminCmsPortal() {
 
   async function handleDownloadTemplate() {
     setTemplateDownloading(true)
+    setError(null)
     try {
       await downloadVotingTemplate(
         wards.map((w) => ({ wardNumber: w.wardNumber })),
         activeCandidates,
       )
+      alert('✓ Template downloaded successfully. Please fill in the voting data and upload it back.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate template.')
+      const errorMsg = err instanceof Error ? err.message : 'Failed to generate template.'
+      setError(errorMsg)
+      alert(`❌ Download Error:\n\n${errorMsg}`)
     } finally {
       setTemplateDownloading(false)
     }
@@ -216,9 +221,16 @@ export function AdminCmsPortal() {
         setParsedRows([])
         setParseErrors([])
         if (fileInputRef.current) fileInputRef.current.value = ''
+        alert(`✓ Upload successful!\n\n${result.wardsProcessed} ward(s) processed\n${result.votesInserted} vote(s) inserted`)
+      } else {
+        const errorMsg = result.error ?? 'Upload failed.'
+        setUploadResult(result)
+        alert(`❌ Upload Error:\n\n${errorMsg}`)
       }
     } catch (err) {
-      setUploadResult({ ok: false, error: err instanceof Error ? err.message : 'Upload failed.' })
+      const errorMsg = err instanceof Error ? err.message : 'Upload failed.'
+      setUploadResult({ ok: false, error: errorMsg })
+      alert(`❌ Upload Error:\n\n${errorMsg}`)
     } finally {
       setUploading(false)
     }
@@ -248,11 +260,16 @@ export function AdminCmsPortal() {
         setBallotWardId('')
         setBallotCandidateIds(new Set())
         await loadAdminData()
+        alert(`✓ Ballot submitted successfully!\n\n${result.votesInserted ?? 0} vote(s) recorded for this ward.`)
       } else {
-        setBallotResult({ ok: false, message: result.error ?? 'Ballot submission failed.' })
+        const errorMsg = result.error ?? 'Ballot submission failed.'
+        setBallotResult({ ok: false, message: errorMsg })
+        alert(`❌ Ballot Error:\n\n${errorMsg}`)
       }
     } catch (err) {
-      setBallotResult({ ok: false, message: err instanceof Error ? err.message : 'Ballot submission failed.' })
+      const errorMsg = err instanceof Error ? err.message : 'Ballot submission failed.'
+      setBallotResult({ ok: false, message: errorMsg })
+      alert(`❌ Ballot Error:\n\n${errorMsg}`)
     } finally {
       setBallotSubmitting(false)
     }
@@ -807,7 +824,9 @@ export function AdminCmsPortal() {
 
           {activeView === 'report' ? (
             <article className="panel admin-card">
-              <h2>Transfer Report &amp; Data Capture</h2>
+              <div className="sheet-controls">
+                <h2>Transfer Report &amp; Data Capture</h2>
+              </div>
 
               {/* KPI summary */}
               <div className="kpi-grid report-grid">
@@ -819,13 +838,29 @@ export function AdminCmsPortal() {
                 <div><p>Nominations</p><strong>{report?.nominationCount ?? 0}</strong></div>
               </div>
 
-              {/* Latest batch */}
-              <div className="mini-panel">
-                <h3>Latest batch</h3>
+              {/* Sub-tabs for Report sections */}
+              <div className="admin-subtabs">
+                <button
+                  className={activeReportView === 'bulk-upload' ? 'subtab-button active' : 'subtab-button'}
+                  onClick={() => setActiveReportView('bulk-upload')}
+                >
+                  Bulk Upload
+                </button>
+                <button
+                  className={activeReportView === 'manual-ballot' ? 'subtab-button active' : 'subtab-button'}
+                  onClick={() => setActiveReportView('manual-ballot')}
+                >
+                  Manual Ballot
+                </button>
+              </div>
+
+              {/* Latest batch info */}
+              <div className="mini-panel status-green">
+                <h3>Latest Batch Status</h3>
                 {report?.latestBatch ? (
                   <dl className="batch-details">
                     <div><dt>File</dt><dd>{report.latestBatch.sourceFilename}</dd></div>
-                    <div><dt>Status</dt><dd>{report.latestBatch.status}</dd></div>
+                    <div><dt>Status</dt><dd><strong>{report.latestBatch.status}</strong></dd></div>
                     <div><dt>Processed</dt><dd>{new Date(report.latestBatch.processedAt).toLocaleString()}</dd></div>
                     <div><dt>Checksum</dt><dd>{report.latestBatch.sourceChecksum ?? '-'}</dd></div>
                     <div className="full-span"><dt>Error</dt><dd>{report.latestBatch.errorSummary ?? 'No errors recorded.'}</dd></div>
@@ -836,10 +871,11 @@ export function AdminCmsPortal() {
               </div>
 
               {/* ---------------------------------------------------------- */}
-              {/* Bulk Excel Upload                                           */}
+              {/* Bulk Excel Upload Section                                   */}
               {/* ---------------------------------------------------------- */}
-              <div className="mini-panel">
-                <h3>Bulk Upload — Excel Template</h3>
+              {activeReportView === 'bulk-upload' && (
+              <div className="mini-panel status-yellow">
+                <h3>📊 Bulk Upload — Excel Template</h3>
                 <p className="muted" style={{ marginBottom: '0.75rem' }}>
                   Download the pre-filled Excel template, capture voting results, then upload the completed file.
                   Each ward's results replace all previously recorded votes for that ward.
@@ -953,12 +989,14 @@ export function AdminCmsPortal() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* ---------------------------------------------------------- */}
-              {/* Manual Ward Ballot Capture                                  */}
+              {/* Manual Ward Ballot Capture Section                          */}
               {/* ---------------------------------------------------------- */}
-              <div className="mini-panel">
-                <h3>Manual Ward Ballot Capture</h3>
+              {activeReportView === 'manual-ballot' && (
+              <div className="mini-panel" style={{ backgroundColor: '#f5f5fa', borderLeft: '4px solid #6200ea' }}>
+                <h3>✓ Manual Ward Ballot Capture</h3>
                 <p className="muted" style={{ marginBottom: '0.75rem' }}>
                   Select a ward and tick the candidates who received a vote (max 6). Submitting fully replaces the ward's existing results.
                 </p>
@@ -1046,6 +1084,7 @@ export function AdminCmsPortal() {
                   </div>
                 </form>
               </div>
+              )}
             </article>
           ) : null}
 

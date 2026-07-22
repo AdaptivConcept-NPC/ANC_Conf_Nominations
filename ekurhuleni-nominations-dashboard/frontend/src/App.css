@@ -647,27 +647,50 @@ body::before {
 
 .admin-hero-stats div,
 .report-grid div {
-  padding: 10px 12px;
-  border: 1px solid rgba(12, 15, 18, 0.12);
+  padding: 16px;
+  border: 2px solid var(--anc-black);
+  border-top: 6px solid var(--anc-black);
   border-radius: 10px;
-  background: #fffef8;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.admin-hero-stats div:nth-child(2),
+.report-grid div:nth-child(2) {
+  border-color: var(--anc-green);
+  border-top-color: var(--anc-green);
+}
+
+.admin-hero-stats div:nth-child(3),
+.report-grid div:nth-child(3) {
+  border-color: var(--anc-yellow);
+  border-top-color: var(--anc-yellow);
+}
+
+.admin-hero-stats div:hover,
+.report-grid div:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(12, 15, 18, 0.12);
 }
 
 .admin-hero-stats span,
 .report-grid p {
   display: block;
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #5f6d7d;
+  letter-spacing: 0.05em;
+  color: var(--anc-muted);
+  font-weight: 700;
 }
 
 .admin-hero-stats strong,
 .report-grid strong {
   display: block;
-  margin-top: 4px;
-  font-size: 1.25rem;
+  margin-top: 6px;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--anc-black);
 }
 
 .admin-grid {
@@ -686,17 +709,74 @@ body::before {
   gap: 14px;
 }
 
+.admin-subtabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  background: transparent;
+}
+
+.subtab-button {
+  padding: 10px 16px;
+  background: transparent;
+  border: 2px solid rgba(12, 15, 18, 0.1);
+  border-bottom: 3px solid rgba(12, 15, 18, 0.1);
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--anc-muted);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  margin-right: -1px;
+}
+
+.subtab-button:hover {
+  border-color: rgba(0, 166, 81, 0.2);
+  color: var(--anc-green);
+}
+
+.subtab-button.active {
+  border-color: var(--anc-green);
+  border-bottom-color: var(--anc-green);
+  background: transparent;
+  color: var(--anc-green);
+  font-weight: 700;
+  box-shadow: 0 -2px 8px rgba(0, 166, 81, 0.1);
+}
+
 .mini-panel {
-  border: 1px solid rgba(12, 15, 18, 0.14);
-  border-radius: 12px;
-  background: #fffdf8;
-  padding: 14px;
+  border: 2px solid var(--anc-black);
+  border-left: 5px solid var(--anc-black);
+  border-radius: 10px;
+  background: transparent;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.mini-panel:hover {
+  box-shadow: 0 4px 12px rgba(12, 15, 18, 0.08);
+  transform: translateY(-1px);
 }
 
 .mini-panel h3 {
   margin-top: 0;
   margin-bottom: 12px;
-  font-size: 1rem;
+  font-size: 1.05rem;
+  color: var(--anc-black);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.mini-panel.status-green {
+  border-left-color: var(--anc-green);
+}
+
+.mini-panel.status-yellow {
+  border-left-color: var(--anc-yellow);
+}
+
+.mini-panel.status-purple {
+  border-left-color: #6200ea;
 }
 
 .form-grid {
@@ -997,21 +1077,54 @@ body::before {
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 10px;
+}
+
+.kpi-grid > div {
+  padding: 14px 16px;
+  border: 2px solid var(--anc-black);
+  border-top: 5px solid var(--anc-black);
+  border-radius: 10px;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.kpi-grid > div:nth-child(2) {
+  border-color: var(--anc-green);
+  border-top-color: var(--anc-green);
+}
+
+.kpi-grid > div:nth-child(3) {
+  border-color: var(--anc-yellow);
+  border-top-color: var(--anc-yellow);
+}
+
+.kpi-grid > div:nth-child(4) {
+  border-color: var(--anc-danger);
+  border-top-color: var(--anc-danger);
+}
+
+.kpi-grid > div:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(12, 15, 18, 0.12);
 }
 
 .kpi-grid p {
   margin: 0;
-  font-size: 0.8rem;
-  color: #5f6d7d;
+  font-size: 0.75rem;
+  color: var(--anc-muted);
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
 }
 
 .kpi-grid strong {
   display: block;
-  margin-top: 4px;
-  font-size: 1.08rem;
+  margin-top: 6px;
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: var(--anc-black);
 }
 
 .chart-panel {
