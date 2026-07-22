@@ -60,22 +60,26 @@ VALUES
 ON CONFLICT (alias_name) DO UPDATE SET
   source_note = EXCLUDED.source_note;
 
+-- NOTE: All vote_count values are 1 (binary) per the authoritative voting rules in
+-- docs/voting-rules.md. The original transfer data contained values > 1 which violated
+-- Rule 2 (max 1 vote per candidate per ward). Those have been corrected here.
+-- Actual ward results must be submitted via the Admin CMS bulk upload or manual capture form.
 INSERT INTO nominations (ward_id, candidate_id, vote_count)
 VALUES
-  ((SELECT id FROM wards WHERE ward_number = 10), (SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 3),
+  ((SELECT id FROM wards WHERE ward_number = 10), (SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 1),
   ((SELECT id FROM wards WHERE ward_number = 10), (SELECT id FROM candidates WHERE full_name = 'Jean Sethato'), 1),
   ((SELECT id FROM wards WHERE ward_number = 10), (SELECT id FROM candidates WHERE full_name = 'Nomadlozi Nkosi'), 1),
   ((SELECT id FROM wards WHERE ward_number = 11), (SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 1),
   ((SELECT id FROM wards WHERE ward_number = 11), (SELECT id FROM candidates WHERE full_name = 'Jongizwe Dlabathi'), 1),
   ((SELECT id FROM wards WHERE ward_number = 14), (SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 1),
-  ((SELECT id FROM wards WHERE ward_number = 1), (SELECT id FROM candidates WHERE full_name = 'Jean Sethato'), 3),
-  ((SELECT id FROM wards WHERE ward_number = 2), (SELECT id FROM candidates WHERE full_name = 'Nomadlozi Nkosi'), 2),
-  ((SELECT id FROM wards WHERE ward_number = 48), (SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 2),
-  ((SELECT id FROM wards WHERE ward_number = 59), (SELECT id FROM candidates WHERE full_name = 'Phelisa Nkunjana'), 2),
-  ((SELECT id FROM wards WHERE ward_number = 72), (SELECT id FROM candidates WHERE full_name = 'Jongizwe Dlabathi'), 2),
-  ((SELECT id FROM wards WHERE ward_number = 74), (SELECT id FROM candidates WHERE full_name = 'Dora Mlambo'), 2),
-  ((SELECT id FROM wards WHERE ward_number = 26), (SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 2),
-  ((SELECT id FROM wards WHERE ward_number = 65), (SELECT id FROM candidates WHERE full_name = 'Jean Sethato'), 2)
+  ((SELECT id FROM wards WHERE ward_number = 1), (SELECT id FROM candidates WHERE full_name = 'Jean Sethato'), 1),
+  ((SELECT id FROM wards WHERE ward_number = 2), (SELECT id FROM candidates WHERE full_name = 'Nomadlozi Nkosi'), 1),
+  ((SELECT id FROM wards WHERE ward_number = 48), (SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 1),
+  ((SELECT id FROM wards WHERE ward_number = 59), (SELECT id FROM candidates WHERE full_name = 'Phelisa Nkunjana'), 1),
+  ((SELECT id FROM wards WHERE ward_number = 72), (SELECT id FROM candidates WHERE full_name = 'Jongizwe Dlabathi'), 1),
+  ((SELECT id FROM wards WHERE ward_number = 74), (SELECT id FROM candidates WHERE full_name = 'Dora Mlambo'), 1),
+  ((SELECT id FROM wards WHERE ward_number = 26), (SELECT id FROM candidates WHERE full_name = 'DOCTOR XHAKAZA'), 1),
+  ((SELECT id FROM wards WHERE ward_number = 65), (SELECT id FROM candidates WHERE full_name = 'Jean Sethato'), 1)
 ON CONFLICT (ward_id, candidate_id) DO UPDATE SET
   vote_count = EXCLUDED.vote_count,
   updated_at = CURRENT_TIMESTAMP;

@@ -79,12 +79,14 @@ Deployment modes:
 
 Core entities:
 - Zone: logical grouping of wards with zonal coordinator label
-- Ward: numbered administrative unit, mapped to a zone
+- Ward: numbered administrative unit, mapped to a zone (each Ward = one Branch)
 - Candidate: unique person identity (canonical full name)
 - Candidate profile: editable administrative record for candidate metadata used by the CMS portal
 - Nomination: vote tally for candidate in a ward for a nomination event
 - Ingestion batch: uploaded or processed dataset run metadata
 - Name alias: raw source variant mapped to canonical candidate
+
+**Authoritative voting rules** (Ward/Branch = 6 votes max, max 1 vote per candidate per ward, candidate score = SUM across all wards) are documented in full in [`docs/voting-rules.md`](voting-rules.md). That document also describes the full-replace-per-ward write semantics, validation strictness levels, the bulk-upload Excel template format, the manual ballot capture form, and a data quality notice regarding the initial transfer data.
 
 ## 7. Database Requirements
 

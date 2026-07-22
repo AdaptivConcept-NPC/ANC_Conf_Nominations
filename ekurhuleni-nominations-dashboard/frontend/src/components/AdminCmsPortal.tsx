@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   fetchAdminAliases,
   fetchAdminCandidates,
@@ -17,6 +17,16 @@ import {
   type AdminZone,
   type AdminAppUser,
 } from '../lib/adminData'
+import {
+  downloadVotingTemplate,
+  fetchActiveCandidatesForVoting,
+  parseVotingWorkbook,
+  submitBulkVotingUpload,
+  submitWardBallot,
+  type BulkUploadResult,
+  type ParsedVoteRow,
+  type VotingTemplateCandidate,
+} from '../lib/votingData'
 
 type ZoneFormState = {
   id: string
@@ -111,6 +121,22 @@ export function AdminCmsPortal() {
   const [activeView, setActiveView] = useState<'profiles' | 'references' | 'report' | 'users'>('profiles')
   const [activeReferenceView, setActiveReferenceView] = useState<'zones' | 'wards' | 'candidates' | 'aliases'>('zones')
 
+  // Voting / Report tab state
+  const [activeCandidates, setActiveCandidates] = useState<VotingTemplateCandidate[]>([])
+  const [templateDownloading, setTemplateDownloading] = useState(false)
+  // Bulk upload
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [parsedRows, setParsedRows] = useState<ParsedVoteRow[]>([])
+  const [parseErrors, setParseErrors] = useState<string[]>([])
+  const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null)
+  const [uploading, setUploading] = useState(false)
+  // Manual ballot capture
+  const [ballotWardId, setBallotWardId] = useState('')
+  const [ballotCandidateIds, setBallotCandidateIds] = useState<Set<string>>(new Set())
+  const [ballotSubmitting, setBallotSubmitting] = useState(false)
+  const [ballotResult, setBallotResult] = useState<{ ok: boolean; message: string } | null>(null)
+
   const [zoneForm, setZoneForm] = useState<ZoneFormState>(emptyZoneForm)
   const [wardForm, setWardForm] = useState<WardFormState>(emptyWardForm)
   const [candidateForm, setCandidateForm] = useState<CandidateFormState>(emptyCandidateForm)
@@ -125,7 +151,7 @@ export function AdminCmsPortal() {
     setLoading(true)
     setError(null)
     try {
-      const [zoneData, wardData, candidateData, aliasData, profileData, reportData, appUserData] = await Promise.all([
+      const [zoneData, wardData, candidateData, aliasData, profileData, reportData, appUserData, activeCandidateData] = await Promise.all([
         fetchAdminZones(),
         fetchAdminWards(),
         fetchAdminCandidates(),
@@ -133,6 +159,7 @@ export function AdminCmsPortal() {
         fetchAdminProfiles(),
         fetchAdminTransferReport(),
         fetchAdminAppUsers(),
+        fetchActiveCandidatesForVoting(),
       ])
 
       setZones(zoneData)
@@ -142,10 +169,92 @@ export function AdminCmsPortal() {
       setProfiles(profileData)
       setReport(reportData)
       setAppUsers(appUserData)
+      setActiveCandidates(activeCandidateData)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load admin CMS data.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDownloadTemplate() {
+    setTemplateDownloading(true)
+    try {
+      await downloadVotingTemplate(
+        wards.map((w) => ({ wardNumber: w.wardNumber })),
+        activeCandidates,
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate template.')
+    } finally {
+      setTemplateDownloading(false)
+    }
+  }
+
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+    setUploadFile(file)
+    setUploadResult(null)
+    setParsedRows([])
+    setParseErrors([])
+    if (!file) return
+    const { rows, parseErrors: errors } = await parseVotingWorkbook(file)
+    setParsedRows(rows)
+    setParseErrors(errors)
+  }
+
+  async function handleBulkUpload() {
+    if (!uploadFile || parsedRows.length === 0) return
+    setUploading(true)
+    setUploadResult(null)
+    try {
+      const result = await submitBulkVotingUpload(parsedRows, uploadFile.name)
+      setUploadResult(result)
+      if (result.ok) {
+        await loadAdminData()
+        setUploadFile(null)
+        setParsedRows([])
+        setParseErrors([])
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    } catch (err) {
+      setUploadResult({ ok: false, error: err instanceof Error ? err.message : 'Upload failed.' })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function toggleBallotCandidate(candidateId: string) {
+    setBallotCandidateIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(candidateId)) {
+        next.delete(candidateId)
+      } else if (next.size < 6) {
+        next.add(candidateId)
+      }
+      return next
+    })
+  }
+
+  async function handleBallotSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!ballotWardId) return
+    setBallotSubmitting(true)
+    setBallotResult(null)
+    try {
+      const result = await submitWardBallot(ballotWardId, Array.from(ballotCandidateIds))
+      if (result.ok) {
+        setBallotResult({ ok: true, message: `Ward ballot submitted. ${result.votesInserted ?? 0} vote(s) recorded.` })
+        setBallotWardId('')
+        setBallotCandidateIds(new Set())
+        await loadAdminData()
+      } else {
+        setBallotResult({ ok: false, message: result.error ?? 'Ballot submission failed.' })
+      }
+    } catch (err) {
+      setBallotResult({ ok: false, message: err instanceof Error ? err.message : 'Ballot submission failed.' })
+    } finally {
+      setBallotSubmitting(false)
     }
   }
 
@@ -698,7 +807,9 @@ export function AdminCmsPortal() {
 
           {activeView === 'report' ? (
             <article className="panel admin-card">
-              <h2>Transfer Report</h2>
+              <h2>Transfer Report &amp; Data Capture</h2>
+
+              {/* KPI summary */}
               <div className="kpi-grid report-grid">
                 <div><p>Zones</p><strong>{report?.zoneCount ?? 0}</strong></div>
                 <div><p>Wards</p><strong>{report?.wardCount ?? 0}</strong></div>
@@ -707,6 +818,8 @@ export function AdminCmsPortal() {
                 <div><p>Profiles</p><strong>{report?.profileCount ?? 0}</strong></div>
                 <div><p>Nominations</p><strong>{report?.nominationCount ?? 0}</strong></div>
               </div>
+
+              {/* Latest batch */}
               <div className="mini-panel">
                 <h3>Latest batch</h3>
                 {report?.latestBatch ? (
@@ -720,6 +833,218 @@ export function AdminCmsPortal() {
                 ) : (
                   <p className="muted">No batch metadata yet.</p>
                 )}
+              </div>
+
+              {/* ---------------------------------------------------------- */}
+              {/* Bulk Excel Upload                                           */}
+              {/* ---------------------------------------------------------- */}
+              <div className="mini-panel">
+                <h3>Bulk Upload — Excel Template</h3>
+                <p className="muted" style={{ marginBottom: '0.75rem' }}>
+                  Download the pre-filled Excel template, capture voting results, then upload the completed file.
+                  Each ward's results replace all previously recorded votes for that ward.
+                </p>
+                <div className="action-row" style={{ marginBottom: '1rem' }}>
+                  <button
+                    type="button"
+                    disabled={templateDownloading || wards.length === 0}
+                    onClick={() => { void handleDownloadTemplate() }}
+                  >
+                    {templateDownloading ? 'Generating…' : 'Download Excel Template'}
+                  </button>
+                  {wards.length === 0 && (
+                    <span className="muted" style={{ marginLeft: '0.5rem' }}>No wards registered yet.</span>
+                  )}
+                </div>
+
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                  <strong>Upload completed template (.xlsx)</strong>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    style={{ display: 'block', marginTop: '0.25rem' }}
+                    onChange={(e) => { void handleFileChange(e) }}
+                  />
+                </label>
+
+                {parseErrors.length > 0 && (
+                  <div className="error-panel" style={{ padding: '0.75rem', borderRadius: '6px', marginBottom: '0.75rem' }}>
+                    <strong>Parse errors</strong>
+                    <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem' }}>
+                      {parseErrors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                {parsedRows.length > 0 && parseErrors.length === 0 && (
+                  <>
+                    <div style={{ marginBottom: '0.5rem' }}>
+                      <strong>{parsedRows.length} row(s) parsed.</strong>
+                      {parsedRows.some((r) => r.parseError) && (
+                        <span className="muted" style={{ marginLeft: '0.5rem' }}>
+                          {parsedRows.filter((r) => r.parseError).length} row(s) have validation issues (shown below).
+                        </span>
+                      )}
+                    </div>
+                    <div className="cms-list-wrap" style={{ maxHeight: '260px', overflowY: 'auto', marginBottom: '0.75rem' }}>
+                      <table className="zone-table">
+                        <thead>
+                          <tr>
+                            <th>Row</th>
+                            <th>Ward</th>
+                            <th>Candidate</th>
+                            <th>Vote</th>
+                            <th>Issue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parsedRows.map((row) => (
+                            <tr key={row.rowIndex} style={row.parseError ? { color: 'var(--color-error, #c00)' } : undefined}>
+                              <td>{row.rowIndex}</td>
+                              <td>{row.wardNumber ?? '—'}</td>
+                              <td>{row.candidateFullName || '—'}</td>
+                              <td>{row.vote ?? '—'}</td>
+                              <td>{row.parseError ?? <span className="muted">OK</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="action-row">
+                      <button
+                        type="button"
+                        disabled={uploading || parsedRows.every((r) => r.parseError !== null)}
+                        onClick={() => { void handleBulkUpload() }}
+                      >
+                        {uploading ? 'Uploading…' : 'Confirm & Upload'}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {uploadResult && (
+                  <div
+                    className={uploadResult.ok ? 'success-panel' : 'error-panel'}
+                    style={{ padding: '0.75rem', borderRadius: '6px', marginTop: '0.75rem' }}
+                  >
+                    {uploadResult.ok ? (
+                      <>
+                        <strong>Upload successful.</strong> {uploadResult.wardsProcessed} ward(s) processed, {uploadResult.votesInserted} vote(s) inserted.
+                        {(uploadResult.warnings ?? []).length > 0 && (
+                          <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem' }}>
+                            {uploadResult.warnings!.map((w, i) => <li key={i}>{w}</li>)}
+                          </ul>
+                        )}
+                        {(uploadResult.rejectedRows ?? []).length > 0 && (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <strong>{uploadResult.rejectedRows!.length} row(s) rejected:</strong>
+                            <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem' }}>
+                              {uploadResult.rejectedRows!.map((r, i) => (
+                                <li key={i}>Row {r.rowIndex}, Ward {String(r.wardNumber)}, {String(r.candidate)}: {r.reason}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <><strong>Upload failed.</strong> {uploadResult.error}</>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ---------------------------------------------------------- */}
+              {/* Manual Ward Ballot Capture                                  */}
+              {/* ---------------------------------------------------------- */}
+              <div className="mini-panel">
+                <h3>Manual Ward Ballot Capture</h3>
+                <p className="muted" style={{ marginBottom: '0.75rem' }}>
+                  Select a ward and tick the candidates who received a vote (max 6). Submitting fully replaces the ward's existing results.
+                </p>
+
+                {ballotResult && (
+                  <div
+                    className={ballotResult.ok ? 'success-panel' : 'error-panel'}
+                    style={{ padding: '0.5rem 0.75rem', borderRadius: '6px', marginBottom: '0.75rem' }}
+                  >
+                    {ballotResult.message}
+                  </div>
+                )}
+
+                <form onSubmit={(e) => { void handleBallotSubmit(e) }}>
+                  <div className="form-grid" style={{ marginBottom: '0.75rem' }}>
+                    <label>
+                      Ward / Branch
+                      <select
+                        value={ballotWardId}
+                        onChange={(e) => {
+                          setBallotWardId(e.target.value)
+                          setBallotCandidateIds(new Set())
+                          setBallotResult(null)
+                        }}
+                        required
+                      >
+                        <option value="">Select ward</option>
+                        {wards.map((w) => (
+                          <option key={w.id} value={w.id}>Ward {w.wardNumber}{w.zoneName ? ` — ${w.zoneName}` : ''}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  {ballotWardId && (
+                    <>
+                      <div style={{ marginBottom: '0.5rem' }}>
+                        <strong>Select candidates</strong>
+                        <span className="muted" style={{ marginLeft: '0.5rem' }}>{ballotCandidateIds.size} / 6 selected</span>
+                      </div>
+                      <div className="cms-list-wrap" style={{ maxHeight: '280px', overflowY: 'auto', marginBottom: '0.75rem' }}>
+                        <table className="zone-table">
+                          <thead>
+                            <tr><th>Vote</th><th>Candidate</th></tr>
+                          </thead>
+                          <tbody>
+                            {activeCandidates.map((c) => {
+                              const checked = ballotCandidateIds.has(c.id)
+                              const disabled = !checked && ballotCandidateIds.size >= 6
+                              return (
+                                <tr key={c.id} style={disabled ? { opacity: 0.45 } : undefined}>
+                                  <td>
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      disabled={disabled}
+                                      onChange={() => toggleBallotCandidate(c.id)}
+                                    />
+                                  </td>
+                                  <td>{c.fullName}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="action-row">
+                    <button type="submit" disabled={!ballotWardId || ballotSubmitting}>
+                      {ballotSubmitting ? 'Submitting…' : 'Submit Ward Ballot'}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setBallotWardId('')
+                        setBallotCandidateIds(new Set())
+                        setBallotResult(null)
+                      }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </form>
               </div>
             </article>
           ) : null}
