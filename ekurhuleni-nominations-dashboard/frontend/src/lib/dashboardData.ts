@@ -12,6 +12,9 @@ export type WardOption = {
 }
 
 export type NominationRecord = {
+  id: string
+  wardId: string
+  candidateId: string
   candidateName: string
   zoneName: string
   wardNumber: number
@@ -30,6 +33,9 @@ type RawWard = {
 }
 
 type RawNomination = {
+  id: string
+  ward_id: string
+  candidate_id: string
   vote_count: number
   candidates: Array<{ full_name: string }> | { full_name: string } | null
   wards: {
@@ -84,7 +90,7 @@ export async function fetchWards(): Promise<WardOption[]> {
 export async function fetchNominations(): Promise<NominationRecord[]> {
   const { data, error } = await supabase
     .from('nominations')
-    .select('vote_count, candidates(full_name), wards(ward_number, zones(name))')
+    .select('id, ward_id, candidate_id, vote_count, candidates(full_name), wards(ward_number, zones(name))')
 
   if (error) {
     throw new Error(`Failed to load nominations: ${error.message}`)
@@ -97,6 +103,9 @@ export async function fetchNominations(): Promise<NominationRecord[]> {
       const zone = ward ? firstOrNull(ward.zones) : null
 
       return {
+        id: row.id,
+        wardId: row.ward_id,
+        candidateId: row.candidate_id,
         vote_count: row.vote_count,
         candidate,
         ward,
@@ -105,6 +114,9 @@ export async function fetchNominations(): Promise<NominationRecord[]> {
     })
     .filter((row) => row.candidate && row.ward && row.zone)
     .map((row) => ({
+      id: row.id,
+      wardId: row.wardId,
+      candidateId: row.candidateId,
       candidateName: row.candidate?.full_name ?? 'Unknown Candidate',
       zoneName: row.zone?.name ?? 'Unknown Zone',
       wardNumber: row.ward?.ward_number ?? -1,

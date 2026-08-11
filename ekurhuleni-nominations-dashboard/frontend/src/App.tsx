@@ -333,7 +333,7 @@ function App() {
             <div>
               <p className="eyebrow">ANC Ekurhuleni</p>
               <h1>NOM2026 PR and Councillor Nominations</h1>
-              <p className="muted">Overview candidate nominations by Ward.</p>
+              <p className="muted">Overview candidate nominations by Zone/Ward.</p>
               <p className="muted hero-session-note">Signed in as {session.user.email ?? 'unknown user'} · {role === 'admin' ? 'Admin access' : 'General access'}</p>
             </div>
           </div>
@@ -394,7 +394,7 @@ function App() {
             </article>
           </section>
 
-          <WorkbookViews records={filteredRecords} zones={zones} />
+          <WorkbookViews records={filteredRecords} zones={zones} wards={wards} />
         </>
       )}
 
