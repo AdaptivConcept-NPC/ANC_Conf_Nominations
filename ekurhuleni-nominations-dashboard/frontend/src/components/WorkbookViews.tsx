@@ -1178,11 +1178,15 @@ function PiePerZoneView({ records, zones }: { records: NominationRecord[]; zones
 function OveralPieView({ records }: { records: NominationRecord[] }) {
   const [topN, setTopN] = useState<6 | 10 | 12 | 0>(0)
   const candidateTotals = useMemo(() => aggregateByCandidate(records), [records])
-  const totalVotes = candidateTotals.reduce((sum, c) => sum + c.votes, 0)
 
   const displayCandidates = useMemo(() => {
     return topN === 0 ? candidateTotals : candidateTotals.slice(0, topN)
   }, [candidateTotals, topN])
+
+  const applicableTotalVotes = useMemo(
+    () => displayCandidates.reduce((sum, c) => sum + c.votes, 0),
+    [displayCandidates],
+  )
 
   const pieData = useMemo(() => {
     return displayCandidates.map((row) => ({ label: row.candidate, value: row.votes }))
@@ -1225,12 +1229,12 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
             {name}
           </text>
           <text x={x} y={y + 8} fill="#697789" textAnchor={isRight ? 'start' : 'end'} dominantBaseline="central" fontSize={9.5}>
-            {value}/{totalVotes} ({pctStr})
+            {pctStr} ({value}/{applicableTotalVotes})
           </text>
         </g>
       )
     },
-    [totalVotes],
+    [applicableTotalVotes],
   )
 
   return (
@@ -1284,14 +1288,14 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
           <h3 style={{ margin: '16px 0 12px 0', fontSize: '1rem', fontWeight: 600 }}>{topN === 0 ? 'All Candidates' : `Top ${topN} Candidates`}</h3>
           <ol className="top-candidates-list">
             {topCandidatesWithLocation.map((candidate, idx) => {
-              const pct = totalVotes > 0 ? (candidate.votes / totalVotes) * 100 : 0
+              const pct = applicableTotalVotes > 0 ? (candidate.votes / applicableTotalVotes) * 100 : 0
               return (
                 <li key={candidate.candidate} className="top-candidate-item">
                   <div className="candidate-card" data-rank={idx + 1}>
                     <div className="candidate-rank-badge">{idx + 1}</div>
                     <div className="candidate-main">
                       <span className="candidate-name">{candidate.candidate}</span>
-                      <span className="candidate-votes">{candidate.votes} / {totalVotes} ({pct.toFixed(1)}%)</span>
+                      <span className="candidate-votes">{candidate.votes} / {applicableTotalVotes} ({pct.toFixed(1)}%)</span>
                     </div>
                     <div className="candidate-meta">
                       <span className="zone-ward-label">Zone {candidate.zone} • Ward {candidate.ward}</span>
@@ -1308,12 +1312,12 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
         <h2>Executive KPI</h2>
         <div className="kpi-grid">
           <div>
-            <p>Total Votes</p>
-            <strong>{totalVotes}</strong>
+            <p>Applicable Votes</p>
+            <strong>{applicableTotalVotes}</strong>
           </div>
           <div>
-            <p>Total Candidates</p>
-            <strong>{candidateTotals.length}</strong>
+            <p>Showing</p>
+            <strong>{displayCandidates.length} of {candidateTotals.length}</strong>
           </div>
         </div>
         <hr />
