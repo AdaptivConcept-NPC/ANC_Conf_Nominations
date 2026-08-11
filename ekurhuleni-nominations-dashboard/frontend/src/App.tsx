@@ -394,7 +394,7 @@ function App() {
             </article>
           </section>
 
-          <WorkbookViews records={filteredRecords} zones={zones} wards={wards} />
+          <WorkbookViews records={filteredRecords} zones={zones} wards={wards} canEdit={canAccessCms} />
         </>
       )}
 

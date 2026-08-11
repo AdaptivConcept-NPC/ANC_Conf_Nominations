@@ -24,6 +24,7 @@ type WorkbookViewsProps = {
   records: NominationRecord[]
   zones: ZoneOption[]
   wards: WardOption[]
+  canEdit: boolean
 }
 
 type TabKey = 'BRANCH NOMINATIONS' | 'TOTAL IN ZONES' | 'VOTE DISTRIBUTION PER ZONE' | 'OVERALL SHARE' | 'PARETO GRAPH'
@@ -302,7 +303,7 @@ function DistributionLegend({
   )
 }
 
-function BranchNomiView({ records, wards }: { records: NominationRecord[]; wards: WardOption[] }) {
+function BranchNomiView({ records, wards, canEdit }: { records: NominationRecord[]; wards: WardOption[]; canEdit: boolean }) {
   const { toast } = useToast()
   const [matrixDirection, setMatrixDirection] = useState<'ward-rows' | 'candidate-rows' | 'zone-rows' | 'zone-candidate-rows'>('ward-rows')
   const [sortBy, setSortBy] = useState<string | null>(null)
@@ -737,11 +738,13 @@ function BranchNomiView({ records, wards }: { records: NominationRecord[]; wards
             </label>
           </div>
         </div>
-        <div className="matrix-guide">
-          {matrixDirection === 'ward-rows' || matrixDirection === 'candidate-rows'
-            ? 'Double-click any cell to toggle the nomination (1 = nominated, 0 = not nominated). Changes save immediately.'
-            : 'Zone view shows aggregated totals across all wards in each zone. Switch to a Ward layout to edit individual nominations.'}
-        </div>
+        {canEdit && (
+          <div className="matrix-guide">
+            {matrixDirection === 'ward-rows' || matrixDirection === 'candidate-rows'
+              ? 'Double-click any cell to toggle the nomination (1 = nominated, 0 = not nominated). Changes save immediately.'
+              : 'Zone view shows aggregated totals across all wards in each zone. Switch to a Ward layout to edit individual nominations.'}
+          </div>
+        )}
         {saving && (
           <div className="matrix-loading-overlay">
             <div className="matrix-loading-spinner" />
@@ -846,33 +849,32 @@ function BranchNomiView({ records, wards }: { records: NominationRecord[]; wards
                        <td style={{ ...totalsColStyle, ...getHeatmapColor(rowTotal, maxRowTotal) }}>
                          {rowTotal}
                        </td>
-                       {candidates.map((candidate) => {
-                         const value = candidateMap.get(candidate) ?? 0
-                         const cellKey = `ward-${ward}-cand-${candidate}`
-                         const isEditing = editingCell?.rowKey === `Ward ${ward}` && editingCell?.colKey === candidate
-                         return (
-                           <td
-                             key={cellKey}
-                             style={{ ...getCellStyle(value), cursor: isEditing ? 'text' : 'pointer' }}
-                             onDoubleClick={() => setEditingCell({ rowKey: `Ward ${ward}`, colKey: candidate })}
-                             title="Double-click to toggle 1 / 0"
-                           >
-                             {isEditing ? (
-                               <select
-                                 autoFocus
-                                 value={value}
-                                 onChange={(e) => handleCellUpdate(ward, candidate, Number(e.target.value), 'ward')}
-                                 onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
-                                 style={{ width: '50px', padding: '2px', textAlign: 'center' }}
-                               >
-                                 <option value={0}>0</option>
-                                 <option value={1}>1</option>
-                               </select>
-                             ) : (
-                               value
-                             )}
+                        {candidates.map((candidate) => {
+                          const value = candidateMap.get(candidate) ?? 0
+                          const cellKey = `ward-${ward}-cand-${candidate}`
+                          const isEditing = canEdit && editingCell?.rowKey === `Ward ${ward}` && editingCell?.colKey === candidate
+                          return (
+                            <td
+                              key={cellKey}
+                              style={{ ...getCellStyle(value), cursor: canEdit && !isEditing ? 'pointer' : 'default' }}
+                              {...(canEdit ? { onDoubleClick: () => setEditingCell({ rowKey: `Ward ${ward}`, colKey: candidate }), title: 'Double-click to toggle 1 / 0' } : {})}
+                            >
+                              {isEditing ? (
+                                <select
+                                  autoFocus
+                                  value={value}
+                                  onChange={(e) => handleCellUpdate(ward, candidate, Number(e.target.value), 'ward')}
+                                  onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
+                                  style={{ width: '50px', padding: '2px', textAlign: 'center' }}
+                                >
+                                  <option value={0}>0</option>
+                                  <option value={1}>1</option>
+                                </select>
+                              ) : (
+                                value
+                              )}
                            </td>
-                        )
+                         )
                       })}
                     </tr>
                   )
@@ -886,31 +888,30 @@ function BranchNomiView({ records, wards }: { records: NominationRecord[]; wards
                        <td style={{ ...totalsColStyle, ...getHeatmapColor(rowTotal, maxRowTotal) }}>
                          {rowTotal}
                       </td>
-                      {sortedMatrixRows.map(({ ward, candidateMap }) => {
-                         const value = candidateMap.get(candidate) ?? 0
-                         const cellKey = `cand-${candidate}-ward-${ward}`
-                         const isEditing = editingCell?.rowKey === candidate && editingCell?.colKey === `Ward ${ward}`
-                         return (
-                           <td
-                             key={cellKey}
-                             style={{ ...getCellStyle(value), cursor: isEditing ? 'text' : 'pointer' }}
-                             onDoubleClick={() => setEditingCell({ rowKey: candidate, colKey: `Ward ${ward}` })}
-                             title="Double-click to toggle 1 / 0"
-                           >
-                             {isEditing ? (
-                               <select
-                                 autoFocus
-                                 value={value}
-                                 onChange={(e) => handleCellUpdate(ward, candidate, Number(e.target.value), 'ward')}
-                                 onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
-                                 style={{ width: '50px', padding: '2px', textAlign: 'center' }}
-                               >
-                                 <option value={0}>0</option>
-                                 <option value={1}>1</option>
-                               </select>
-                             ) : (
-                               value
-                             )}
+                       {sortedMatrixRows.map(({ ward, candidateMap }) => {
+                          const value = candidateMap.get(candidate) ?? 0
+                          const cellKey = `cand-${candidate}-ward-${ward}`
+                          const isEditing = canEdit && editingCell?.rowKey === candidate && editingCell?.colKey === `Ward ${ward}`
+                          return (
+                            <td
+                              key={cellKey}
+                              style={{ ...getCellStyle(value), cursor: canEdit && !isEditing ? 'pointer' : 'default' }}
+                              {...(canEdit ? { onDoubleClick: () => setEditingCell({ rowKey: candidate, colKey: `Ward ${ward}` }), title: 'Double-click to toggle 1 / 0' } : {})}
+                            >
+                              {isEditing ? (
+                                <select
+                                  autoFocus
+                                  value={value}
+                                  onChange={(e) => handleCellUpdate(ward, candidate, Number(e.target.value), 'ward')}
+                                  onKeyDown={(e) => { if (e.key === 'Escape') setEditingCell(null) }}
+                                  style={{ width: '50px', padding: '2px', textAlign: 'center' }}
+                                >
+                                  <option value={0}>0</option>
+                                  <option value={1}>1</option>
+                                </select>
+                              ) : (
+                                value
+                              )}
                            </td>
                         )
                       })}
@@ -1479,7 +1480,7 @@ function OveralGraphView({ records }: { records: NominationRecord[] }) {
   )
 }
 
-export function WorkbookViews({ records, zones, wards }: WorkbookViewsProps) {
+export function WorkbookViews({ records, zones, wards, canEdit }: WorkbookViewsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     try {
       const saved = localStorage.getItem('dashboardActiveTab')
@@ -1585,7 +1586,7 @@ export function WorkbookViews({ records, zones, wards }: WorkbookViewsProps) {
         </div>
       </nav>
 
-      {(isPrintingAll || activeTab === 'BRANCH NOMINATIONS') && <BranchNomiView records={records} wards={wards} />}
+      {(isPrintingAll || activeTab === 'BRANCH NOMINATIONS') && <BranchNomiView records={records} wards={wards} canEdit={canEdit} />}
       {(isPrintingAll || activeTab === 'TOTAL IN ZONES') && <TotalInZonesView records={records} />}
       {(isPrintingAll || activeTab === 'VOTE DISTRIBUTION PER ZONE') && <PiePerZoneView records={records} zones={zones} />}
       {(isPrintingAll || activeTab === 'OVERALL SHARE') && <OveralPieView records={records} />}
