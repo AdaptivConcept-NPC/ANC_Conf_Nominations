@@ -53,107 +53,37 @@ function formatBarLabel(value: unknown) {
   return `${numeric}`
 }
 
-function renderPiePercentLabel({
-  cx,
-  cy,
-  midAngle,
-  outerRadius,
-  percent,
-}: {
-  cx?: number
-  cy?: number
-  midAngle?: number
-  outerRadius?: number
-  percent?: number
-}) {
-  if (
-    cx === undefined ||
-    cy === undefined ||
-    midAngle === undefined ||
-    outerRadius === undefined ||
-    percent === undefined ||
-    percent < 0.04
-  ) {
-    return null
+function createDetailedPieLabel(total: number) {
+  return function detailedPieLabel(props: Record<string, any>) {
+    const { cx, cy, midAngle, outerRadius, percent, name, value } = props
+    if (
+      cx === undefined || cy === undefined || midAngle === undefined ||
+      outerRadius === undefined || percent === undefined || percent < 0.04
+    ) return null
+
+    const RADIAN = Math.PI / 180
+    const labelRadius = outerRadius + 30
+    const x = cx + labelRadius * Math.cos(-midAngle * RADIAN)
+    const y = cy + labelRadius * Math.sin(-midAngle * RADIAN)
+    const lineEndX = cx + (outerRadius + 8) * Math.cos(-midAngle * RADIAN)
+    const lineEndY = cy + (outerRadius + 8) * Math.sin(-midAngle * RADIAN)
+
+    const pctStr = (percent * 100).toFixed(1) + '%'
+    const isRight = x > cx
+
+    return (
+      <g>
+        <line x1={lineEndX} y1={lineEndY} x2={x + (isRight ? -10 : 10)} y2={y} stroke="#999" strokeWidth={0.5} />
+        <circle cx={lineEndX} cy={lineEndY} r={2} fill="#999" />
+        <text x={x} y={y - 6} fill="#1f242c" textAnchor={isRight ? 'start' : 'end'} dominantBaseline="central" fontSize={10} fontWeight={700}>
+          {name}
+        </text>
+        <text x={x} y={y + 8} fill="#697789" textAnchor={isRight ? 'start' : 'end'} dominantBaseline="central" fontSize={9.5}>
+          {value}/{total} ({pctStr})
+        </text>
+      </g>
+    )
   }
-
-  const RADIAN = Math.PI / 180
-  const radius = outerRadius + 18
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
-
-  return (
-    <text
-      x={x}
-      y={y}
-      fill="#1f242c"
-      textAnchor={x > cx ? 'start' : 'end'}
-      dominantBaseline="central"
-      fontSize={12}
-      fontWeight={700}
-    >
-      {`${(percent * 100).toFixed(0)}%`}
-    </text>
-  )
-}
-
-function renderPieNamePercentLabel({
-  cx,
-  cy,
-  midAngle,
-  outerRadius,
-  percent,
-  name,
-}: {
-  cx?: number
-  cy?: number
-  midAngle?: number
-  outerRadius?: number
-  percent?: number
-  name?: string
-}) {
-  if (
-    cx === undefined ||
-    cy === undefined ||
-    midAngle === undefined ||
-    outerRadius === undefined ||
-    percent === undefined ||
-    percent < 0.05
-  ) {
-    return null
-  }
-
-  const RADIAN = Math.PI / 180
-  const radius = outerRadius + 20
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
-
-  return (
-    <g>
-      <text
-        x={x}
-        y={y - 6}
-        fill="#1f242c"
-        textAnchor={x > cx ? 'start' : 'end'}
-        dominantBaseline="central"
-        fontSize={11}
-        fontWeight={700}
-      >
-        {name}
-      </text>
-      <text
-        x={x}
-        y={y + 8}
-        fill="#1f242c"
-        textAnchor={x > cx ? 'start' : 'end'}
-        dominantBaseline="central"
-        fontSize={10}
-        fontWeight={600}
-      >
-        {`${(percent * 100).toFixed(0)}%`}
-      </text>
-    </g>
-  )
 }
 
 function aggregateByCandidate(records: NominationRecord[]) {
@@ -1054,6 +984,9 @@ function TotalInZonesView({ records }: { records: NominationRecord[] }) {
   const zoneTotals = useMemo(() => aggregateByZone(records), [records])
   const candidateTotals = useMemo(() => aggregateByCandidate(records), [records])
   const { data: stackData, stackItems } = useMemo(() => aggregateByCandidateStack(records, stackBy), [records, stackBy])
+  const zoneGrandTotal = useMemo(() => zoneTotals.reduce((sum, z) => sum + z.votes, 0), [zoneTotals])
+  const pieData = useMemo(() => zoneTotals.map((row) => ({ label: row.zone, value: row.votes })), [zoneTotals])
+  const zonePieLabel = useMemo(() => createDetailedPieLabel(zoneGrandTotal), [zoneGrandTotal])
 
   if (records.length === 0) {
     return <section className="panel"><p className="muted">No records available for TOTAL IN ZONES.</p></section>
@@ -1077,24 +1010,23 @@ function TotalInZonesView({ records }: { records: NominationRecord[] }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="chart-surface" style={{ height: 350, marginTop: '24px' }}>
+          <div className="chart-surface pie-chart-surface">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart margin={{ top: 50, right: 50, bottom: 50, left: 50 }}>
                 <Pie
-                  data={zoneTotals}
-                  dataKey="votes"
-                  nameKey="zone"
-                  outerRadius={110}
-                  innerRadius={50}
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="label"
+                  outerRadius={90}
                   labelLine={false}
-                  label={renderPiePercentLabel}
+                  label={zonePieLabel}
                 >
-                  {zoneTotals.map((entry, index) => (
-                    <Cell key={entry.zone} fill={STACK_COLORS[index % STACK_COLORS.length]} />
+                  {pieData.map((entry, index) => (
+                    <Cell key={entry.label} fill={STACK_COLORS[index % STACK_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value) => [`${value} votes`, 'Votes']} />
-                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                <Legend wrapperStyle={{ paddingTop: '16px' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -1184,8 +1116,9 @@ function PiePerZoneView({ records, zones }: { records: NominationRecord[]; zones
 
   const zoneRecords = useMemo(() => records.filter((record) => record.zoneName === activeZone), [records, activeZone])
   const candidateTotals = useMemo(() => aggregateByCandidate(zoneRecords), [zoneRecords])
-
   const pieData = candidateTotals.map((row) => ({ label: row.candidate, value: row.votes }))
+  const zoneTotalVotes = useMemo(() => pieData.reduce((sum, d) => sum + d.value, 0), [pieData])
+  const perZonePieLabel = useMemo(() => createDetailedPieLabel(zoneTotalVotes), [zoneTotalVotes])
 
   if (!activeZone) {
     return <section className="panel"><p className="muted">No zones available.</p></section>
@@ -1213,15 +1146,14 @@ function PiePerZoneView({ records, zones }: { records: NominationRecord[]; zones
 
         <div className="chart-surface">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            <PieChart margin={{ top: 30, right: 30, bottom: 30, left: 30 }}>
               <Pie
                 data={pieData}
                 dataKey="value"
                 nameKey="label"
-                outerRadius={86}
-                innerRadius={42}
+                outerRadius={65}
                 labelLine={false}
-                label={renderPiePercentLabel}
+                label={perZonePieLabel}
               >
                 {pieData.map((entry, index) => (
                   <Cell key={entry.label} fill={STACK_COLORS[index % STACK_COLORS.length]} />
@@ -1244,14 +1176,20 @@ function PiePerZoneView({ records, zones }: { records: NominationRecord[]; zones
 }
 
 function OveralPieView({ records }: { records: NominationRecord[] }) {
+  const [topN, setTopN] = useState<6 | 10 | 12 | 0>(0)
   const candidateTotals = useMemo(() => aggregateByCandidate(records), [records])
-  const pieData = candidateTotals.map((row) => ({ label: row.candidate, value: row.votes }))
-  const totalVotes = pieData.reduce((sum, row) => sum + row.value, 0)
-  
-  // Get top 6 candidates with zone and ward info
-  const top6CandidatesWithLocation = useMemo(() => {
-    return candidateTotals.slice(0, 6).map((candidate) => {
-      // Find first record for this candidate to get zone and ward
+  const totalVotes = candidateTotals.reduce((sum, c) => sum + c.votes, 0)
+
+  const displayCandidates = useMemo(() => {
+    return topN === 0 ? candidateTotals : candidateTotals.slice(0, topN)
+  }, [candidateTotals, topN])
+
+  const pieData = useMemo(() => {
+    return displayCandidates.map((row) => ({ label: row.candidate, value: row.votes }))
+  }, [displayCandidates])
+
+  const topCandidatesWithLocation = useMemo(() => {
+    return displayCandidates.map((candidate) => {
       const candidateRecord = records.find((r) => r.candidateName === candidate.candidate)
       return {
         ...candidate,
@@ -1259,23 +1197,79 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
         ward: candidateRecord?.wardNumber ?? 'N/A',
       }
     })
-  }, [candidateTotals, records])
+  }, [displayCandidates, records])
+
+  const overallPieLabel = useCallback(
+    (props: Record<string, any>) => {
+      const { cx, cy, midAngle, outerRadius, percent, name, value } = props
+      if (
+        cx === undefined || cy === undefined || midAngle === undefined ||
+        outerRadius === undefined || percent === undefined || percent < 0.04
+      ) return null
+
+      const RADIAN = Math.PI / 180
+      const labelRadius = outerRadius + 35
+      const x = cx + labelRadius * Math.cos(-midAngle * RADIAN)
+      const y = cy + labelRadius * Math.sin(-midAngle * RADIAN)
+      const lineEndX = cx + (outerRadius + 8) * Math.cos(-midAngle * RADIAN)
+      const lineEndY = cy + (outerRadius + 8) * Math.sin(-midAngle * RADIAN)
+
+      const pctStr = (percent * 100).toFixed(1) + '%'
+      const isRight = x > cx
+
+      return (
+        <g>
+          <line x1={lineEndX} y1={lineEndY} x2={x + (isRight ? -10 : 10)} y2={y} stroke="#999" strokeWidth={0.5} />
+          <circle cx={lineEndX} cy={lineEndY} r={2} fill="#999" />
+          <text x={x} y={y - 6} fill="#1f242c" textAnchor={isRight ? 'start' : 'end'} dominantBaseline="central" fontSize={10} fontWeight={700}>
+            {name}
+          </text>
+          <text x={x} y={y + 8} fill="#697789" textAnchor={isRight ? 'start' : 'end'} dominantBaseline="central" fontSize={9.5}>
+            {value}/{totalVotes} ({pctStr})
+          </text>
+        </g>
+      )
+    },
+    [totalVotes],
+  )
 
   return (
     <section className="sheet-grid two-up">
       <article className="panel" style={{ maxWidth: '100%', overflow: 'hidden' }}>
-        <h2>Overall Candidate Share</h2>
-        <div className="chart-surface">
+        <div className="sheet-controls">
+          <h2>Overall Candidate Share</h2>
+          <div className="toggle-row">
+            <div className="filter-group">
+              <button
+                type="button"
+                className={topN === 0 ? 'filter-btn active' : 'filter-btn'}
+                onClick={() => setTopN(0)}
+              >
+                All
+              </button>
+              {([6, 10, 12] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={topN === n ? 'filter-btn active' : 'filter-btn'}
+                  onClick={() => setTopN(n)}
+                >
+                  Top {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="chart-surface pie-chart-surface">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            <PieChart margin={{ top: 50, right: 50, bottom: 50, left: 50 }}>
               <Pie
                 data={pieData}
                 dataKey="value"
                 nameKey="label"
-                outerRadius={96}
-                innerRadius={44}
+                outerRadius={90}
                 labelLine={false}
-                label={renderPieNamePercentLabel}
+                label={overallPieLabel}
               >
                 {pieData.map((entry, index) => (
                   <Cell key={entry.label} fill={STACK_COLORS[index % STACK_COLORS.length]} />
@@ -1286,11 +1280,10 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
           </ResponsiveContainer>
         </div>
         
-        {/* Top 6 Candidates Grid */}
         <div className="top-candidates-container">
-          <h3 style={{ margin: '16px 0 12px 0', fontSize: '1rem', fontWeight: 600 }}>Top 6 Candidates</h3>
+          <h3 style={{ margin: '16px 0 12px 0', fontSize: '1rem', fontWeight: 600 }}>{topN === 0 ? 'All Candidates' : `Top ${topN} Candidates`}</h3>
           <ol className="top-candidates-list">
-            {top6CandidatesWithLocation.map((candidate, idx) => {
+            {topCandidatesWithLocation.map((candidate, idx) => {
               const pct = totalVotes > 0 ? (candidate.votes / totalVotes) * 100 : 0
               return (
                 <li key={candidate.candidate} className="top-candidate-item">
@@ -1298,7 +1291,7 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
                     <div className="candidate-rank-badge">{idx + 1}</div>
                     <div className="candidate-main">
                       <span className="candidate-name">{candidate.candidate}</span>
-                      <span className="candidate-votes">{candidate.votes} votes ({pct.toFixed(1)}%)</span>
+                      <span className="candidate-votes">{candidate.votes} / {totalVotes} ({pct.toFixed(1)}%)</span>
                     </div>
                     <div className="candidate-meta">
                       <span className="zone-ward-label">Zone {candidate.zone} • Ward {candidate.ward}</span>
