@@ -145,6 +145,10 @@ export function AdminCmsPortal() {
   const [profileForm, setProfileForm] = useState<ProfileFormState>(emptyProfileForm)
   const [appUserForm, setAppUserForm] = useState<AppUserFormState>(emptyAppUserForm)
 
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [profileModalMode, setProfileModalMode] = useState<'view' | 'edit'>('view')
+  const [profileSearch, setProfileSearch] = useState('')
+
   const wardOptions = useMemo(() => wards, [wards])
   const candidateOptions = useMemo(() => candidates, [candidates])
 
@@ -299,6 +303,121 @@ export function AdminCmsPortal() {
     }
   }
 
+  const profileByCandidate = useMemo(() => {
+    const map = new Map<string, AdminProfile>()
+    for (const profile of profiles) {
+      map.set(profile.candidateId, profile)
+    }
+    return map
+  }, [profiles])
+
+  const candidateRows = useMemo(
+    () =>
+      candidates.map((candidate) => ({
+        candidate,
+        profile: profileByCandidate.get(candidate.id) ?? null,
+      })),
+    [candidates, profileByCandidate],
+  )
+
+  const filteredCandidateRows = useMemo(() => {
+    const query = profileSearch.trim().toLowerCase()
+    if (!query) return candidateRows
+    return candidateRows.filter(({ candidate, profile }) => {
+      const searchable = [
+        candidate.fullName,
+        profile?.displayName ?? '',
+        profile?.zoneName ?? '',
+        profile?.wardNumber ? `Ward ${profile.wardNumber}` : '',
+      ]
+      return searchable.some((value) => value.toLowerCase().includes(query))
+    })
+  }, [candidateRows, profileSearch])
+
+  function openProfileCreate() {
+    setProfileForm(emptyProfileForm)
+    setProfileModalMode('edit')
+    setProfileModalOpen(true)
+  }
+
+  function openProfileEditForCandidate(candidateId: string) {
+    const profile = profileByCandidate.get(candidateId)
+    const candidate = candidates.find((item) => item.id === candidateId)
+    setProfileForm(
+      profile
+        ? {
+            id: profile.id,
+            candidateId: profile.candidateId,
+            displayName: profile.displayName,
+            photoUrl: profile.photoUrl ?? '',
+            shortBio: profile.shortBio ?? '',
+            contactPhone: profile.contactPhone ?? '',
+            contactEmail: profile.contactEmail ?? '',
+            zoneId: profile.zoneId ?? '',
+            wardId: profile.wardId ?? '',
+            status: profile.status,
+            notes: profile.notes ?? '',
+          }
+        : {
+            id: '',
+            candidateId,
+            displayName: candidate?.fullName ?? '',
+            photoUrl: '',
+            shortBio: '',
+            contactPhone: '',
+            contactEmail: '',
+            zoneId: '',
+            wardId: '',
+            status: 'draft',
+            notes: '',
+          },
+    )
+    setProfileModalMode('edit')
+    setProfileModalOpen(true)
+  }
+
+  function openProfileView(profile: AdminProfile) {
+    setProfileForm({
+      id: profile.id,
+      candidateId: profile.candidateId,
+      displayName: profile.displayName,
+      photoUrl: profile.photoUrl ?? '',
+      shortBio: profile.shortBio ?? '',
+      contactPhone: profile.contactPhone ?? '',
+      contactEmail: profile.contactEmail ?? '',
+      zoneId: profile.zoneId ?? '',
+      wardId: profile.wardId ?? '',
+      status: profile.status,
+      notes: profile.notes ?? '',
+    })
+    setProfileModalMode('view')
+    setProfileModalOpen(true)
+  }
+
+  function closeProfileModal() {
+    setProfileModalOpen(false)
+    setProfileForm(emptyProfileForm)
+  }
+
+  function submitProfileForm(event: React.FormEvent) {
+    event.preventDefault()
+    void handleSave({
+      resource: 'profile',
+      ...profileForm,
+      id: profileForm.id || undefined,
+      photoUrl: profileForm.photoUrl || null,
+      shortBio: profileForm.shortBio || null,
+      contactPhone: profileForm.contactPhone || null,
+      contactEmail: profileForm.contactEmail || null,
+      zoneId: profileForm.zoneId || null,
+      wardId: profileForm.wardId || null,
+      notes: profileForm.notes || null,
+    }).then(() => {
+      setProfileModalOpen(false)
+      setProfileForm(emptyProfileForm)
+    })
+  }
+
   if (loading) {
     return (
       <section className="panel">
@@ -399,117 +518,31 @@ export function AdminCmsPortal() {
           {activeView === 'profiles' ? (
             <article className="panel admin-card">
               <div className="sheet-controls">
-                <h2>Candidate Profile Capture</h2>
+                <div>
+                  <h2>Candidate Profiles</h2>
+                  <p className="muted">All candidates with their captured profile. Click a candidate to view or edit their profile.</p>
+                </div>
+                <button type="button" className="primary-button" onClick={openProfileCreate}>
+                  + New Profile
+                </button>
               </div>
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  void handleSave({
-                    resource: 'profile',
-                    ...profileForm,
-                    id: profileForm.id || undefined,
-                    photoUrl: profileForm.photoUrl || null,
-                    shortBio: profileForm.shortBio || null,
-                    contactPhone: profileForm.contactPhone || null,
-                    contactEmail: profileForm.contactEmail || null,
-                    zoneId: profileForm.zoneId || null,
-                    wardId: profileForm.wardId || null,
-                    notes: profileForm.notes || null,
-                  })
-                }}
-              >
-                <div className="form-section">
-                  <h4>Primary Details</h4>
-                  <div className="form-grid">
-                    <label>
-                      Candidate
-                      <select value={profileForm.candidateId} onChange={(event) => setProfileForm((current) => ({ ...current, candidateId: event.target.value }))} required>
-                        <option value="">Select candidate</option>
-                        {candidateOptions.map((candidate) => (
-                          <option key={candidate.id} value={candidate.id}>
-                            {candidate.fullName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Display name
-                      <input value={profileForm.displayName} onChange={(event) => setProfileForm((current) => ({ ...current, displayName: event.target.value }))} required />
-                    </label>
-                    <label>
-                      Status
-                      <select value={profileForm.status} onChange={(event) => setProfileForm((current) => ({ ...current, status: event.target.value as ProfileFormState['status'] }))}>
-                        <option value="draft">Draft</option>
-                        <option value="active">Active</option>
-                        <option value="archived">Archived</option>
-                      </select>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="form-section">
-                  <h4>Location & Contact</h4>
-                  <div className="form-grid">
-                    <label>
-                      Zone
-                      <select value={profileForm.zoneId} onChange={(event) => setProfileForm((current) => ({ ...current, zoneId: event.target.value }))}>
-                        <option value="">No zone</option>
-                        {zones.map((zone) => (
-                          <option key={zone.id} value={zone.id}>
-                            {zone.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Ward
-                      <select value={profileForm.wardId} onChange={(event) => setProfileForm((current) => ({ ...current, wardId: event.target.value }))}>
-                        <option value="">No ward</option>
-                        {wardOptions.map((ward) => (
-                          <option key={ward.id} value={ward.id}>
-                            Ward {ward.wardNumber}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Phone
-                      <input value={profileForm.contactPhone} onChange={(event) => setProfileForm((current) => ({ ...current, contactPhone: event.target.value }))} />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="form-section">
-                  <h4>Media & Bio</h4>
-                  <div className="form-grid">
-                    <label className="full-span">
-                      Photo URL
-                      <input value={profileForm.photoUrl} onChange={(event) => setProfileForm((current) => ({ ...current, photoUrl: event.target.value }))} />
-                    </label>
-                    <label className="full-span">
-                      Short bio
-                      <textarea rows={3} value={profileForm.shortBio} onChange={(event) => setProfileForm((current) => ({ ...current, shortBio: event.target.value }))} />
-                    </label>
-                    <label className="full-span">
-                      Notes
-                      <textarea rows={3} value={profileForm.notes} onChange={(event) => setProfileForm((current) => ({ ...current, notes: event.target.value }))} />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="action-row">
-                  <button type="submit" disabled={saving === 'profile'}>
-                    {saving === 'profile' ? 'Saving...' : 'Save profile'}
-                  </button>
-                  <button type="button" className="secondary-button" onClick={() => setProfileForm(emptyProfileForm)}>
-                    Reset
-                  </button>
-                </div>
-              </form>
+              <div className="profile-toolbar">
+                <input
+                  type="search"
+                  className="profile-search-input"
+                  placeholder="Search by name, zone or ward..."
+                  value={profileSearch}
+                  onChange={(event) => setProfileSearch(event.target.value)}
+                />
+                <span className="muted profile-count">
+                  {filteredCandidateRows.length} / {candidateRows.length} candidate(s)
+                </span>
+              </div>
               <div className="cms-list-wrap">
                 <table className="zone-table">
                   <thead>
                     <tr>
+                      <th>Candidate</th>
                       <th>Profile</th>
                       <th>Status</th>
                       <th>Zone / Ward</th>
@@ -517,38 +550,63 @@ export function AdminCmsPortal() {
                     </tr>
                   </thead>
                   <tbody>
-                    {profiles.map((profile) => (
-                      <tr key={profile.id}>
-                        <td>{profile.displayName}</td>
-                        <td><span className={`status-pill ${profile.status}`}>{profile.status}</span></td>
+                    {filteredCandidateRows.map(({ candidate, profile }) => (
+                      <tr key={candidate.id}>
+                        <td>{candidate.fullName}</td>
                         <td>
-                          {profile.zoneName ?? '-'} / {profile.wardNumber ? `Ward ${profile.wardNumber}` : '-'}
+                          {profile ? (
+                            <span className="status-pill active">Captured</span>
+                          ) : (
+                            <span className="status-pill archived">Not captured</span>
+                          )}
                         </td>
                         <td>
-                          <button
-                            type="button"
-                            className="link-button"
-                            onClick={() =>
-                              setProfileForm({
-                                id: profile.id,
-                                candidateId: profile.candidateId,
-                                displayName: profile.displayName,
-                                photoUrl: profile.photoUrl ?? '',
-                                shortBio: profile.shortBio ?? '',
-                                contactPhone: profile.contactPhone ?? '',
-                                contactEmail: profile.contactEmail ?? '',
-                                zoneId: profile.zoneId ?? '',
-                                wardId: profile.wardId ?? '',
-                                status: profile.status,
-                                notes: profile.notes ?? '',
-                              })
-                            }
-                          >
-                            Edit
-                          </button>
+                          {profile ? (
+                            <span className={`status-pill ${profile.status}`}>{profile.status}</span>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          {profile ? `${profile.zoneName ?? '-'} / ${profile.wardNumber ? `Ward ${profile.wardNumber}` : '-'}` : '-'}
+                        </td>
+                        <td>
+                          {profile ? (
+                            <div className="action-row">
+                              <button
+                                type="button"
+                                className="link-button"
+                                onClick={() => openProfileView(profile)}
+                              >
+                                View
+                              </button>
+                              <button
+                                type="button"
+                                className="link-button"
+                                onClick={() => openProfileEditForCandidate(candidate.id)}
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="link-button"
+                              onClick={() => openProfileEditForCandidate(candidate.id)}
+                            >
+                              Add Profile
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
+                    {filteredCandidateRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="muted profile-empty">
+                          No candidates match your search.
+                        </td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
               </div>
@@ -1213,6 +1271,177 @@ export function AdminCmsPortal() {
           ) : null}
         </section>
       </section>
+
+      {profileModalOpen ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title" onClick={closeProfileModal}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">Candidate Profile</p>
+                <h3 id="profile-modal-title">
+                  {profileForm.candidateId
+                    ? candidateOptions.find((candidate) => candidate.id === profileForm.candidateId)?.fullName ?? 'Candidate'
+                    : 'New Profile'}
+                </h3>
+              </div>
+              <button type="button" className="modal-close-button" onClick={closeProfileModal} aria-label="Close profile dialog">
+                ×
+              </button>
+            </div>
+
+            {profileModalMode === 'view' ? (
+              <div className="modal-body">
+                <dl className="profile-view-list">
+                  <div>
+                    <dt>Display name</dt>
+                    <dd>{profileForm.displayName || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd><span className={`status-pill ${profileForm.status}`}>{profileForm.status}</span></dd>
+                  </div>
+                  <div>
+                    <dt>Zone</dt>
+                    <dd>{zones.find((zone) => zone.id === profileForm.zoneId)?.name ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Ward</dt>
+                    <dd>{wardOptions.find((ward) => ward.id === profileForm.wardId) ? `Ward ${wardOptions.find((ward) => ward.id === profileForm.wardId)!.wardNumber}` : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Phone</dt>
+                    <dd>{profileForm.contactPhone || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Email</dt>
+                    <dd>{profileForm.contactEmail || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Photo URL</dt>
+                    <dd>{profileForm.photoUrl ? <a href={profileForm.photoUrl} target="_blank" rel="noreferrer">{profileForm.photoUrl}</a> : '—'}</dd>
+                  </div>
+                  <div className="full-span">
+                    <dt>Short bio</dt>
+                    <dd>{profileForm.shortBio || '—'}</dd>
+                  </div>
+                  <div className="full-span">
+                    <dt>Notes</dt>
+                    <dd>{profileForm.notes || '—'}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : (
+              <form onSubmit={submitProfileForm} className="modal-body">
+                <div className="form-section">
+                  <h4>Primary Details</h4>
+                  <div className="form-grid">
+                    <label>
+                      Candidate
+                      <select value={profileForm.candidateId} onChange={(event) => setProfileForm((current) => ({ ...current, candidateId: event.target.value }))} required>
+                        <option value="">Select candidate</option>
+                        {candidateOptions.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Display name
+                      <input value={profileForm.displayName} onChange={(event) => setProfileForm((current) => ({ ...current, displayName: event.target.value }))} required />
+                    </label>
+                    <label>
+                      Status
+                      <select value={profileForm.status} onChange={(event) => setProfileForm((current) => ({ ...current, status: event.target.value as ProfileFormState['status'] }))}>
+                        <option value="draft">Draft</option>
+                        <option value="active">Active</option>
+                        <option value="archived">Archived</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-section">
+                  <h4>Location & Contact</h4>
+                  <div className="form-grid">
+                    <label>
+                      Zone
+                      <select value={profileForm.zoneId} onChange={(event) => setProfileForm((current) => ({ ...current, zoneId: event.target.value }))}>
+                        <option value="">No zone</option>
+                        {zones.map((zone) => (
+                          <option key={zone.id} value={zone.id}>
+                            {zone.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Ward
+                      <select value={profileForm.wardId} onChange={(event) => setProfileForm((current) => ({ ...current, wardId: event.target.value }))}>
+                        <option value="">No ward</option>
+                        {wardOptions.map((ward) => (
+                          <option key={ward.id} value={ward.id}>
+                            Ward {ward.wardNumber}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Phone
+                      <input value={profileForm.contactPhone} onChange={(event) => setProfileForm((current) => ({ ...current, contactPhone: event.target.value }))} />
+                    </label>
+                    <label>
+                      Email
+                      <input type="email" value={profileForm.contactEmail} onChange={(event) => setProfileForm((current) => ({ ...current, contactEmail: event.target.value }))} />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-section">
+                  <h4>Media & Bio</h4>
+                  <div className="form-grid">
+                    <label className="full-span">
+                      Photo URL
+                      <input value={profileForm.photoUrl} onChange={(event) => setProfileForm((current) => ({ ...current, photoUrl: event.target.value }))} />
+                    </label>
+                    <label className="full-span">
+                      Short bio
+                      <textarea rows={3} value={profileForm.shortBio} onChange={(event) => setProfileForm((current) => ({ ...current, shortBio: event.target.value }))} />
+                    </label>
+                    <label className="full-span">
+                      Notes
+                      <textarea rows={3} value={profileForm.notes} onChange={(event) => setProfileForm((current) => ({ ...current, notes: event.target.value }))} />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="action-row modal-footer-actions">
+                  <button type="submit" disabled={saving === 'profile'}>
+                    {saving === 'profile' ? 'Saving...' : 'Save profile'}
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => setProfileForm(emptyProfileForm)}>
+                    Reset
+                  </button>
+                  <button type="button" className="secondary-button" onClick={closeProfileModal}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {profileModalMode === 'view' ? (
+              <div className="modal-footer">
+                <button type="button" className="secondary-button" onClick={closeProfileModal}>
+                  Close
+                </button>
+                <button type="button" onClick={() => setProfileModalMode('edit')}>
+                  Edit Profile
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }
