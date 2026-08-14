@@ -5,10 +5,8 @@ import {
   Bar,
   BarChart,
   Cell,
-  ComposedChart,
   LabelList,
   Legend,
-  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -27,9 +25,9 @@ type WorkbookViewsProps = {
   canEdit: boolean
 }
 
-type TabKey = 'BRANCH NOMINATIONS' | 'TOTAL IN ZONES' | 'VOTE DISTRIBUTION PER ZONE' | 'OVERALL SHARE' | 'PARETO GRAPH'
+type TabKey = 'BRANCH NOMINATIONS' | 'TOTAL IN ZONES' | 'VOTE DISTRIBUTION PER ZONE' | 'OVERALL SHARE' | 'VOTES BAR CHART'
 
-const TABS: TabKey[] = ['BRANCH NOMINATIONS', 'TOTAL IN ZONES', 'VOTE DISTRIBUTION PER ZONE', 'OVERALL SHARE', 'PARETO GRAPH']
+const TABS: TabKey[] = ['BRANCH NOMINATIONS', 'TOTAL IN ZONES', 'VOTE DISTRIBUTION PER ZONE', 'OVERALL SHARE', 'VOTES BAR CHART']
 const EXCEL_COLORS = [
   '#4472C4', '#ED7D31', '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47',
   '#264478', '#9E480E', '#636363', '#997300', '#255E91', '#43682B'
@@ -1327,87 +1325,33 @@ function OveralPieView({ records }: { records: NominationRecord[] }) {
   )
 }
 
-function ParetoChartCard({
+function VoteBarChartCard({
   title,
   data,
 }: {
   title: string
-  data: Array<{ label: string; votes: number; cumulativeSharePct: number }>
+  data: Array<{ label: string; votes: number }>
 }) {
   return (
     <div className="pareto-card">
       <h2>{title}</h2>
       <div className="chart-surface wide">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 30, bottom: 20, left: 24 }}>
+          <BarChart data={data} margin={{ top: 8, right: 24, bottom: 20, left: 24 }}>
             <XAxis dataKey="label" interval={0} angle={-45} textAnchor="end" height={120} tickMargin={10} />
             <YAxis
               yAxisId="votes"
               label={{ value: 'Votes', angle: -90, position: 'insideLeft', offset: 2, fill: '#1f242c' }}
-            />
-            <YAxis
-              yAxisId="pct"
-              orientation="right"
-              domain={[0, 100]}
-              tickFormatter={(value) => `${value}%`}
-              label={{
-                value: 'Cumulative Share (%)',
-                angle: 90,
-                position: 'right',
-                dx: 12,
-                textAnchor: 'middle',
-                fill: '#1f242c',
-              }}
             />
             <Tooltip />
             <Legend />
             <Bar yAxisId="votes" dataKey="votes" name="Votes" fill="#00a651" radius={[6, 6, 0, 0]}>
               <LabelList dataKey="votes" position="top" formatter={formatBarLabel} fill="#1f242c" fontSize={11} />
             </Bar>
-            <Line yAxisId="pct" dataKey="cumulativeSharePct" name="Cumulative Share %" stroke="#0c0f12" strokeWidth={2} dot={false} />
-          </ComposedChart>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>
-  )
-}
-
-function ParetoIndicatorsCard({
-  title,
-  leadingVotes,
-  leadingCount,
-  totalVotes,
-}: {
-  title: string
-  leadingVotes: number
-  leadingCount: number
-  totalVotes: number
-}) {
-  const othersVotes = totalVotes - leadingVotes
-  const topLabel = `Top ${leadingCount}`
-
-  return (
-    <article className="panel">
-      <h2>{title}</h2>
-      <div className="kpi-grid">
-        <div>
-          <p>{topLabel} Votes</p>
-          <strong>{leadingVotes}</strong>
-        </div>
-        <div>
-          <p>{topLabel} Share</p>
-          <strong>{totalVotes > 0 ? ((leadingVotes / totalVotes) * 100).toFixed(1) : '0.0'}%</strong>
-        </div>
-        <div>
-          <p>Others Votes</p>
-          <strong>{othersVotes}</strong>
-        </div>
-        <div>
-          <p>Others Share</p>
-          <strong>{totalVotes > 0 ? ((othersVotes / totalVotes) * 100).toFixed(1) : '0.0'}%</strong>
-        </div>
-      </div>
-    </article>
   )
 }
 
@@ -1415,64 +1359,24 @@ function OveralGraphView({ records }: { records: NominationRecord[] }) {
   const candidateTotals = useMemo(() => aggregateByCandidate(records), [records])
   const zoneTotals = useMemo(() => aggregateByZone(records), [records])
 
-  const paretoDataZone = useMemo(() => {
-    const total = zoneTotals.reduce((sum, row) => sum + row.votes, 0)
-    let running = 0
-    return zoneTotals.map((row) => {
-      running += row.votes
-      return {
-        label: row.zone,
-        votes: row.votes,
-        cumulativeSharePct: total > 0 ? (running / total) * 100 : 0,
-      }
-    })
-  }, [zoneTotals])
+  const zoneChartData = useMemo(
+    () => zoneTotals.map((row) => ({ label: row.zone, votes: row.votes })),
+    [zoneTotals],
+  )
 
-  const paretoDataCandidate = useMemo(() => {
-    const total = candidateTotals.reduce((sum, row) => sum + row.votes, 0)
-    let running = 0
-    return candidateTotals.map((row) => {
-      running += row.votes
-      return {
-        label: row.candidate,
-        votes: row.votes,
-        cumulativeSharePct: total > 0 ? (running / total) * 100 : 0,
-      }
-    })
-  }, [candidateTotals])
-
-  const totalVotes = candidateTotals.reduce((sum, row) => sum + row.votes, 0)
-  const paretoCutoffPct = 80
-
-  const leadingIndexZone = paretoDataZone.findIndex((row) => row.cumulativeSharePct >= paretoCutoffPct)
-  const leadingCountZone = leadingIndexZone >= 0 ? leadingIndexZone + 1 : zoneTotals.length
-  const leadingVotesZone = zoneTotals.slice(0, leadingCountZone).reduce((sum, row) => sum + row.votes, 0)
-
-  const leadingIndexCandidate = paretoDataCandidate.findIndex((row) => row.cumulativeSharePct >= paretoCutoffPct)
-  const leadingCountCandidate = leadingIndexCandidate >= 0 ? leadingIndexCandidate + 1 : candidateTotals.length
-  const leadingVotesCandidate = candidateTotals.slice(0, leadingCountCandidate).reduce((sum, row) => sum + row.votes, 0)
+  const candidateChartData = useMemo(
+    () => candidateTotals.map((row) => ({ label: row.candidate, votes: row.votes })),
+    [candidateTotals],
+  )
 
   return (
     <section className="sheet-grid single">
       <article className="panel" style={{ maxWidth: '100%', overflow: 'hidden' }}>
-        <ParetoChartCard title="Zone Pareto (X-Axis: Zones)" data={paretoDataZone} />
+        <VoteBarChartCard title="Votes by Zone" data={zoneChartData} />
       </article>
-      <ParetoIndicatorsCard
-        title={`Zone Indicators (Top ${leadingCountZone} reaches ${paretoCutoffPct}%)`}
-        leadingVotes={leadingVotesZone}
-        leadingCount={leadingCountZone}
-        totalVotes={totalVotes}
-      />
-
       <article className="panel" style={{ maxWidth: '100%', overflow: 'hidden' }}>
-        <ParetoChartCard title="Candidate Pareto (X-Axis: Candidates)" data={paretoDataCandidate} />
+        <VoteBarChartCard title="Votes by Candidate" data={candidateChartData} />
       </article>
-      <ParetoIndicatorsCard
-        title={`Candidate Indicators (Top ${leadingCountCandidate} reaches ${paretoCutoffPct}%)`}
-        leadingVotes={leadingVotesCandidate}
-        leadingCount={leadingCountCandidate}
-        totalVotes={totalVotes}
-      />
     </section>
   )
 }
@@ -1587,7 +1491,7 @@ export function WorkbookViews({ records, zones, wards, canEdit }: WorkbookViewsP
       {(isPrintingAll || activeTab === 'TOTAL IN ZONES') && <TotalInZonesView records={records} />}
       {(isPrintingAll || activeTab === 'VOTE DISTRIBUTION PER ZONE') && <PiePerZoneView records={records} zones={zones} />}
       {(isPrintingAll || activeTab === 'OVERALL SHARE') && <OveralPieView records={records} />}
-      {(isPrintingAll || activeTab === 'PARETO GRAPH') && <OveralGraphView records={records} />}
+      {(isPrintingAll || activeTab === 'VOTES BAR CHART') && <OveralGraphView records={records} />}
     </section>
   )
 }
