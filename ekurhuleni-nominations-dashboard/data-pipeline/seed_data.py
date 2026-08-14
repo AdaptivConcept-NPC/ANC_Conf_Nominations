@@ -15,10 +15,36 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_U
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 CANONICAL_NAME_MAP = {
+    # Case / spelling variants canoncalised to the client's TOTAL IN ZONES
+    # candidate list (spellings reconciled in docs/NOM2026.xlsx).
     "DOCTOR XHAKZA": "DOCTOR XHAKAZA",
     "Jean sethato": "Jean Sethato",
     "Nomadlozi nkosi": "Nomadlozi Nkosi",
-    "jongizizwe Dlabathi": "Jongizwe Dlabathi",
+    "Jongizizwe Dlabathi": "Jongizwe Dlabathi",
+    "Lesiba mpya": "Lesiba Mpya",
+    "Lovemore chauke": "Lovemore Chauke",
+    "Gift patose": "Gift Patose",
+    "kagiso sebothoma": "kagiso Sebothoma",
+    "Cassius Mabasa": "Cassuis Mabasa",
+    "Clerence": "Clerrence",
+    "Emily Mohlala": "Emilly Mohlala",
+    "Anntte Pienaar": "Annette Pienaar",
+    "Bongani Kraai": "Bongani Kaai",
+    "Irvine Mohlala": "Irvin Mohlala",
+    "Moipone Mhlomgo": "Moipone Mhlongo",
+    "Nsizwe Mankge": "Nsizwe Mekge",
+    "Robert Mashigo": "Robbert Mashego",
+    "Sergio Mfeka": "Sergio Mkefa",
+    "Sizakele Masuku": "Sizkele Masuku",
+    "Lucky khumalo": "Lucky Khumalo",
+    "Lucky maile": "Lucky Maile",
+    "Nogoge": "Goje",
+}
+
+# BRANCH NOMI header labels that differ from the registered zone names.
+ZONE_NAME_MAP = {
+    "BAVUMILE V": "BAVUMILE VILAKAZI",
+    "GRACE FLATHELA": "GRACE FLATELA",
 }
 
 WARD_PATTERN = re.compile(r"WARD\s*(\d+)", re.IGNORECASE)
@@ -59,6 +85,8 @@ def parse_branch_nomi(filepath: Path) -> Tuple[Dict[Tuple[str, int, str], int], 
         if not zone_label or zone_label.lower().startswith("column"):
             continue
 
+        zone_label = ZONE_NAME_MAP.get(zone_label, zone_label)
+
         current_ward = None
         for row_idx in range(header_row_index + 1, len(sheet)):
             raw_value = normalize_whitespace(str(sheet.iat[row_idx, col_idx]))
@@ -74,6 +102,12 @@ def parse_branch_nomi(filepath: Path) -> Tuple[Dict[Tuple[str, int, str], int], 
                 continue
 
             if raw_value.upper().startswith("WARD"):
+                continue
+
+            # Skip stray numeric cells and in-progress markers; they are not names.
+            if raw_value.isdigit():
+                continue
+            if raw_value.upper().startswith("XXX"):
                 continue
 
             canonical_name = canonicalize_name(raw_value)

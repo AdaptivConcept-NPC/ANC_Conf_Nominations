@@ -122,9 +122,15 @@ function App() {
   const stats = useMemo(() => {
     const totalVotes = filteredRecords.reduce((sum, record) => sum + record.voteCount, 0)
     const candidateCount = new Set(filteredRecords.map((record) => record.candidateName)).size
-    const wardCount = new Set(filteredRecords.map((record) => record.wardNumber)).size
-    return { totalVotes, candidateCount, wardCount }
-  }, [filteredRecords])
+    const activeWardCount = new Set(filteredRecords.map((record) => record.wardNumber)).size
+    const wardCount =
+      selectedWard !== 'all'
+        ? 1
+        : selectedZone === 'all'
+          ? wards.length
+          : wards.filter((ward) => ward.zoneName === selectedZone).length
+    return { totalVotes, candidateCount, activeWardCount, wardCount }
+  }, [filteredRecords, selectedZone, selectedWard, wards])
 
   const visibleWards = useMemo(() => {
     if (selectedZone === 'all') {
@@ -390,7 +396,7 @@ function App() {
             </article>
             <article className="panel stat-card">
               <p className="stat-label">Active Wards</p>
-              <p className="stat-value">{stats.wardCount}</p>
+              <p className="stat-value">{stats.activeWardCount} / {stats.wardCount}</p>
             </article>
           </section>
 
